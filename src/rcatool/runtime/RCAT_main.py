@@ -1256,7 +1256,7 @@ img_outdir = os.path.join(cdict['outdir'], 'imgs')
 if os.path.exists(cdict['outdir']):
     msg = ("\nOutput folder\n\n{}\n\nalready exists!\nDo you want "
            "to overwrite? y/n: ".format(cdict['outdir']))
-    overwrite = input(msg)
+    overwrite = 'y'
     if overwrite == 'y':
         [os.makedirs(os.path.join(stat_outdir, t), exist_ok=True)
          for t in stat_names]
