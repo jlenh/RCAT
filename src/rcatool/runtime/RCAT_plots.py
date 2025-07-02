@@ -35,7 +35,7 @@ class PlotConfiguration(object):
         # Reference model and the rest
         self.models = pdict['models']
         self.nmod = len(self.models)
-        self.ref_model = self. models[0]
+        self.ref_model = self.models[0]
         self.othr_mod = self.models.copy()
         self.othr_mod.remove(self.ref_model)
 
@@ -654,8 +654,9 @@ class PlotConfiguration(object):
                     self.plot_mulc
         else:
             ll_abs = [[fmod_msk[self.ref_model][self.var].values[i, :]
-                       for i in range(12)]]
-
+                       for i in range(12)]] +\
+                     [[fmod_msk[m][self.var].values[i, :]
+                       for i in range(12)] for m in self.othr_mod]
             ll_diff = [[fmod_msk[m][self.var].values[i, :] -
                         fmod_msk[self.ref_model][self.var].values[i, :]
                         for i in range(12)] for m in self.othr_mod]
@@ -666,41 +667,47 @@ class PlotConfiguration(object):
                      for i in range(12)] for m in self.othr_mod]
             ndata = (self.nmod - 1)
             data_names = [self.ref_model.upper()] +\
+                [m for m in self.othr_mod] +\
                 [f"{m}-{self.ref_model.upper()}"
                  for m in self.othr_mod] * self.plot_mulc
 
+        # data = (ndata + 1) abs + (ndata) diff + (ndata) diff_rel
         dlist = ll_abs + ll_diff + ll_diff_rel if\
             self.include_relative_change else ll_abs + ll_diff
+        ndata_tot = (3 if self.include_relative_change else 2) * ndata + 1
 
         # figure settings
-        figsize = (18, 14)
+        figsize = (18, 9)
         figshape = (3, 4)
 
         # color maps
         if self.var == 'pr':
-            cmap = [mpl.cm.YlGnBu] + [mpl.cm.BrBG]*ndata*self.plot_mulc
+            cmap = [mpl.cm.YlGnBu]*(ndata + 1) + [mpl.cm.BrBG]*ndata*self.plot_mulc
         else:
-            cmap = [mpl.cm.Spectral_r] + [mpl.cm.RdBu_r]*ndata*self.plot_mulc
+            cmap = [mpl.cm.Spectral_r]*(ndata + 1) + [mpl.cm.RdBu_r]*ndata*self.plot_mulc
 
         clevs_abs = self.get_clevs(np.array(dlist[0]), centered=False)
-        clevs_dif = self.get_clevs(np.array(dlist[1]), centered=True)
         fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
-        fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
+        clevs_dif = None
+        fmt_dif = None
+        if ndata > 0:
+            clevs_dif = self.get_clevs(np.array(dlist[ndata + 2]), centered=True)
+            fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
         if self.include_relative_change:
-            clevs_rel = self.get_clevs(np.array(dlist[1+ndata]), centered=True)
+            clevs_rel = self.get_clevs(np.array(dlist[2 * (ndata + 1)]), centered=True)
             fmt_rel = self._get_colorbar_label_formatting(clevs_rel[::2])
-            clevs = [clevs_abs] + [clevs_dif]*ndata + [clevs_rel]*ndata
-            fmt = [fmt_abs] + [fmt_dif]*ndata + [fmt_rel]*ndata
+            clevs = [clevs_abs]*(ndata + 1) + [clevs_dif]*ndata + [clevs_rel]*ndata
+            fmt = [fmt_abs]*(ndata + 1) + [fmt_dif]*ndata + [fmt_rel]*ndata
         else:
-            clevs = [clevs_abs] + [clevs_dif]*ndata
-            fmt = [fmt_abs] + [fmt_dif]*ndata
+            clevs = [clevs_abs]*(ndata + 1) + [clevs_dif]*ndata
+            fmt = [fmt_abs]*(ndata + 1) + [fmt_dif]*ndata
 
         thr = fmod_msk[self.ref_model].attrs['Description'].\
             split('|')[2].split(':')[1].strip()
-        units = [self.units] * (ndata + 1)
-        fn_stat_names = [None] + [(f"{self.statistic.replace(' ', '_')}"
-                                   f"_abs_diff")] * ndata
+        units = [self.units] * (2*ndata + 1)
+        fn_stat_names = [None]*(ndata + 1) + [
+            (f"{self.statistic.replace(' ', '_')}_abs_diff")] * ndata
         ftitles = self.define_figure_titles()
 
         if self.include_relative_change:
@@ -709,9 +716,9 @@ class PlotConfiguration(object):
             units = units + ["%"] * ndata
 
         # Loop over data sets
-        for p, ft, data_name, st_nme, uts in zip(range(ndata*self.plot_mulc+1),
-                                                 ftitles, data_names,
-                                                 fn_stat_names, units):
+        for p, ft, data_name, st_nme, uts in zip(
+            range(ndata_tot), ftitles, data_names, fn_stat_names, units
+        ):
             headtitle = f'{ft} | {self.var} [{uts}]'\
                     if thr == 'None' else\
                     f'{ft} | {self.var} [{uts}] | Threshold: {thr}'
