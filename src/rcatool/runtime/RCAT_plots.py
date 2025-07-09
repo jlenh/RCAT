@@ -623,6 +623,11 @@ class PlotConfiguration(object):
                 for m, f in zip(self.models, self.fm_list)}
         fmod_msk = {m: self._mask_data(ds) for m, ds in fmod.items()}
 
+        # In case of only one model as input and no comparison
+        #   = do not include relative change.
+        if not (self.othr_mod or (self.ref_obs is not None)):
+            self.include_relative_change = False
+
         if self.ref_obs is not None:
             fobs = {o: xa.open_dataset(f)
                     for o, f in zip(self.obslist, self.fo_list)}
