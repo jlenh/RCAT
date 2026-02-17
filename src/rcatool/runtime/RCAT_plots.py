@@ -302,6 +302,8 @@ class PlotConfiguration(object):
                        for m in data_name_list]
         else:
             ftitles = [f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}"]\
+                + [f"{m.upper()} {self.time_suffix_dd[m]}"
+                   for m in data_name_list]\
                 + [(f"{m.upper()} {self.time_suffix_dd[m]} -\n "
                     f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}")
                     for m in data_name_list] * self.plot_mulc
