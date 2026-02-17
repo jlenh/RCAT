@@ -977,6 +977,7 @@ def define_map_object(projection='Stereographic', **proj_kwargs):
         'InterruptedGoodeHomolosine': ccrs.InterruptedGoodeHomolosine,
         'SouthPolarStereo': ccrs.SouthPolarStereo,
         'NorthPolarStereo': ccrs.NorthPolarStereo,
+        'NearsidePerspective': ccrs.NearsidePerspective,
     }
 
     return projection_dict[projection](**proj_kwargs)
