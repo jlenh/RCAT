@@ -369,6 +369,8 @@ class PlotConfiguration(object):
         else:
             dlist = [fmod_msk[self.ref_model][self.var].values[i, :]
                      for i in range(4)] +\
+                    [fmod_msk[m][self.var].values[i, :]
+                     for m in self.othr_mod for i in range(4)] +\
                     [fmod_msk[m][self.var].values[i, :] -
                      fmod_msk[self.ref_model][self.var].values[i, :]
                      for m in self.othr_mod for i in range(4)]
@@ -379,7 +381,7 @@ class PlotConfiguration(object):
                         [(fmod_msk[m][self.var].values[i, :] /
                          fmod_msk[self.ref_model][self.var].values[i, :]
                          - 1)*100 for m in self.othr_mod for i in range(4)]
-            ndata = self.nmod-1
+            ndata = self.nmod - 1
 
         data_list = [dlist, dlist_rel] if\
             self.include_relative_change else [dlist]
