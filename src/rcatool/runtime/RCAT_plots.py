@@ -302,8 +302,10 @@ class PlotConfiguration(object):
                         f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}")
                        for m in data_name_list]
         else:
-            ftitles = [f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}"]\
-                + [(f"{m.upper()} {self.time_suffix_dd[m]} -\n "
+            ftitles = [f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}"]+\
+                [f"{m.upper()} {self.time_suffix_dd[m]}"
+                 for m in data_name_list] +\
+                [(f"{m.upper()} {self.time_suffix_dd[m]} -\n "
                     f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}")
                     for m in data_name_list] * self.plot_mulc
         ftitles = [ft.replace('_', ' ') for ft in ftitles]
@@ -634,7 +636,9 @@ class PlotConfiguration(object):
             fobs_msk = {o: self._mask_data(ds) for o, ds in fobs.items()}
 
             ll_abs = [[fobs_msk[self.ref_obs][self.var].values[i, :]
-                       for i in range(12)]]
+                       for i in range(12)]] +\
+                     [[fmod_msk[m][self.var].values[i, :]
+                       for i in range(12)] for m in self.models]
             ll_diff = [[fmod_msk[m][self.var].values[i, :] -
                         fobs_msk[self.ref_obs][self.var].values[i, :]
                         for i in range(12)] for m in self.models]
@@ -655,12 +659,16 @@ class PlotConfiguration(object):
                         for o in self.obslist[1:]]
             if len(self.obslist) > 1:
                 ndata = (self.nmod + len(self.obslist[1:]))
-                data_names = [self.ref_obs] + [
-                    f"{m}-{self.ref_obs}"
-                    for m in self.models + self.obslist[1:]] * self.plot_mulc
+                nabs = self.nmod + 1
+                data_names = [self.ref_obs] +\
+                    [m for m in self.models] +\
+                    [f"{m}-{self.ref_obs}"
+                     for m in self.models + self.obslist[1:]] * self.plot_mulc
             else:
                 ndata = self.nmod
+                nabs = self.nmod + 1
                 data_names = [self.ref_obs] +\
+                    [m for m in self.models] +\
                     [f"{m}-{self.ref_obs}" for m in self.models] *\
                     self.plot_mulc
         else:
@@ -677,15 +685,16 @@ class PlotConfiguration(object):
                       fmod_msk[self.ref_model][self.var].values[i, :] - 1)*100
                      for i in range(12)] for m in self.othr_mod]
             ndata = (self.nmod - 1)
+            nabs = self.nmod
             data_names = [self.ref_model.upper()] +\
                 [m for m in self.othr_mod] +\
                 [f"{m}-{self.ref_model.upper()}"
                  for m in self.othr_mod] * self.plot_mulc
 
-        # data = (ndata + 1) abs + (ndata) diff + (ndata) diff_rel
+        # datasets = (nabs) abs + (ndata) diff + (ndata) diff_rel
         dlist = ll_abs + ll_diff + ll_diff_rel if\
             self.include_relative_change else ll_abs + ll_diff
-        ndata_tot = (3 if self.include_relative_change else 2) * ndata + 1
+        ndata_tot = nabs + ndata * self.plot_mulc
 
         # figure settings
         figsize = (18, 9)
@@ -693,32 +702,38 @@ class PlotConfiguration(object):
 
         # color maps
         if self.var == 'pr':
-            cmap = [mpl.cm.YlGnBu]*(ndata + 1) + [mpl.cm.BrBG]*ndata*self.plot_mulc
+            cmap = [mpl.cm.YlGnBu] * nabs +\
+                [mpl.cm.BrBG] * ndata * self.plot_mulc
         else:
-            cmap = [mpl.cm.Spectral_r]*(ndata + 1) + [mpl.cm.RdBu_r]*ndata*self.plot_mulc
+            cmap = [mpl.cm.Spectral_r] * nabs +\
+                [mpl.cm.RdBu_r] * ndata * self.plot_mulc
 
         clevs_abs = self.get_clevs(np.array(dlist[0]), centered=False)
         fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
-        clevs_dif = None
-        fmt_dif = None
+        clevs_dif = []
+        fmt_dif = []
         if ndata > 0:
-            clevs_dif = self.get_clevs(np.array(dlist[ndata + 2]), centered=True)
+            clevs_dif = self.get_clevs(
+                np.array(dlist[nabs]), centered=True)
             fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
         if self.include_relative_change:
-            clevs_rel = self.get_clevs(np.array(dlist[2 * (ndata + 1)]), centered=True)
+            clevs_rel = self.get_clevs(
+                np.array(dlist[nabs + ndata]), centered=True)
             fmt_rel = self._get_colorbar_label_formatting(clevs_rel[::2])
-            clevs = [clevs_abs]*(ndata + 1) + [clevs_dif]*ndata + [clevs_rel]*ndata
-            fmt = [fmt_abs]*(ndata + 1) + [fmt_dif]*ndata + [fmt_rel]*ndata
+            clevs = [clevs_abs] * nabs + [clevs_dif] * ndata +\
+                [clevs_rel] * ndata
+            fmt = [fmt_abs] * nabs + [fmt_dif] * ndata +\
+                [fmt_rel] * ndata
         else:
-            clevs = [clevs_abs]*(ndata + 1) + [clevs_dif]*ndata
-            fmt = [fmt_abs]*(ndata + 1) + [fmt_dif]*ndata
+            clevs = [clevs_abs] * nabs + [clevs_dif] * ndata
+            fmt = [fmt_abs] * nabs + [fmt_dif] * ndata
 
         thr = fmod_msk[self.ref_model].attrs['Description'].\
             split('|')[2].split(':')[1].strip()
-        units = [self.units] * (2*ndata + 1)
-        fn_stat_names = [None]*(ndata + 1) + [
-            (f"{self.statistic.replace(' ', '_')}_abs_diff")] * ndata
+        units = [self.units] * (nabs + ndata)
+        fn_stat_names = [None] * nabs +\
+            [(f"{self.statistic.replace(' ', '_')}_abs_diff")] * ndata
         ftitles = self.define_figure_titles()
 
         if self.include_relative_change:
@@ -731,8 +746,8 @@ class PlotConfiguration(object):
             range(ndata_tot), ftitles, data_names, fn_stat_names, units
         ):
             headtitle = f'{ft} | {self.var} [{uts}]'\
-                    if thr == 'None' else\
-                    f'{ft} | {self.var} [{uts}] | Threshold: {thr}'
+                if thr == 'None' else\
+                f'{ft} | {self.var} [{uts}] | Threshold: {thr}'
 
             fn = self.define_file_names(
                 thr, 'map', data_name=data_name, stat_name=st_nme)
@@ -1514,6 +1529,8 @@ class PlotConfiguration(object):
                          fobs_msk[self.ref_obs][self.var].values
                          for m in self.models]
 
+                nabs = 1
+
                 if len(self.obslist) > 1:
                     dlist += [fobs_msk[o][self.var].values -
                               fobs_msk[self.ref_obs][self.var].values
@@ -1523,10 +1540,11 @@ class PlotConfiguration(object):
                     ndata = self.nmod
             else:
                 dlist = [fmod_msk[self.ref_model][self.var].values] +\
+                        [fmod_msk[m][self.var].values for m in self.othr_mod] +\
                         [fmod_msk[m][self.var].values -
                          fmod_msk[self.ref_model][self.var].values
                          for m in self.othr_mod]
-                ndata = self.nmod-1
+                ndata = self.nmod - 1
 
             ftitles = self.define_figure_titles()
 
@@ -1540,12 +1558,15 @@ class PlotConfiguration(object):
                 figsize = (18, 12)
             else:
                 figsize = (20, 10)
-            figshape = (1, ndata+1)
+            if self.othr_mod or (self.ref_obs is not None):
+                figshape = (1, ndata+1)
+            else:
+                figshape = (1, 1)
 
             if self.var == 'pr':
-                cmap = [mpl.cm.YlGnBu] + [mpl.cm.BrBG]*ndata
+                cmap = [mpl.cm.YlGnBu] * (ndata + 1) + [mpl.cm.BrBG]*ndata
             else:
-                cmap = [mpl.cm.Spectral_r] + [mpl.cm.RdBu_r]*ndata
+                cmap = [mpl.cm.Spectral_r] * (ndata + 1) + [mpl.cm.RdBu_r]*ndata
 
             headtitle = (f'{self.var} [{self.units}] | Stat: '
                          f'{moment_stat} | {self.tsuffix_title}') if\
@@ -1566,12 +1587,14 @@ class PlotConfiguration(object):
                 grid_lines=self.map_gridlines, **self.map_axes_conf)
 
             clevs_abs = self.get_clevs(np.array(dlist[0]), centered=False)
-            clevs_dif = self.get_clevs(np.array(dlist[1]), centered=True)
-
             fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
-            fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
-            clevs = [clevs_abs] + [clevs_dif]*ndata
+            clevs_dif = None
+            fmt_dif = None
+            if ndata > 0:
+                clevs_dif = self.get_clevs(np.array(dlist[ndata + 2]), centered=True)
+                fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
+            clevs = [clevs_abs] * (ndata + 1) + [clevs_dif]*ndata
             fmt = [fmt_abs] + [fmt_dif]*ndata
 
             # Plot the maps
@@ -1648,7 +1671,7 @@ class PlotConfiguration(object):
                 if thr != 'None' else\
                 f'{self.var} |  Threshold: {thr}\n{reg} | {self.tsuffix_title}'
 
-            fn = self.define_file_names(thr, 'lnplot')
+            fn = self.define_file_names(thr, 'lnplot', region=reg)
 
             # figure settings
             figsize = (19, 8) if self.othr_mod or (self.ref_obs is not None) else (10, 8)
@@ -1680,10 +1703,11 @@ class PlotConfiguration(object):
             axs[0].legend(handles=legend_elements,
                           fontsize='x-large', framealpha=.5)
             if self.othr_mod or (self.ref_obs is not None):
-                legend_elements = [Line2D([0], [0], lw=2, color=c, label=l)
-                                for c, l in zip(self.rel_colors, lg_lbls[1])]
+                legend_elements = [
+                    Line2D([0], [0], lw=2, color=c, label=l)
+                    for c, l in zip(self.rel_colors, lg_lbls[1])]
                 axs[1].legend(handles=legend_elements,
-                            fontsize='x-large', framealpha=.5)
+                              fontsize='x-large', framealpha=.5)
 
             [rpl.axes_settings(ax, xlabel=xlabel[a], xticks=xticks,
                                ylabel=ylabel[a], xtlabels=xtlbls,
