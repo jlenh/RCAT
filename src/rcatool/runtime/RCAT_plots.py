@@ -59,6 +59,7 @@ class PlotConfiguration(object):
 
         self.regions = pdict['regions']
         self.img_dir = pdict['img dir']
+        self.full_domain = pdict['full_domain']
 
         # Map settings
         self.map_projection = pdict['map projection']
