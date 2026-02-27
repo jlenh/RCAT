@@ -218,7 +218,7 @@ def get_mod_data(model, mconf, tres, var, varnames, factor, offset, deacc):
     mod_vers = f'{mod_vers}/' if mod_vers is not None else ''
 
     file_path = os.path.join(mconf['fpath'],
-                             f'{tres}/{mod_vers}{readvar}/{readvar}_*.nc')
+                             f'{tres}/{readvar}/{mod_vers}{readvar}_*.nc')
     _flist = glob.glob(file_path)
 
     errmsg = (f"Could not find any files at specified location:\n{file_path}")
