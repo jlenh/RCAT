@@ -1508,7 +1508,7 @@ class PlotConfiguration(object):
                         [fmod_msk[m][self.var].values -
                          fmod_msk[self.ref_model][self.var].values
                          for m in self.othr_mod]
-                ndata = self.nmod-1
+                ndata = self.nmod - 1
 
             ftitles = self.define_figure_titles()
 
@@ -1522,12 +1522,12 @@ class PlotConfiguration(object):
                 figsize = (18, 12)
             else:
                 figsize = (20, 10)
-            figshape = (1, ndata+1)
+            figshape = (1, ndata + 1)
 
             if self.var == 'pr':
-                cmap = [mpl.cm.YlGnBu] + [mpl.cm.BrBG]*ndata
+                cmap = [mpl.cm.YlGnBu] + [mpl.cm.BrBG] * ndata
             else:
-                cmap = [mpl.cm.Spectral_r] + [mpl.cm.RdBu_r]*ndata
+                cmap = [mpl.cm.Spectral_r] + [mpl.cm.RdBu_r] * ndata
 
             headtitle = (f'{self.var} [{self.units}] | Stat: '
                          f'{moment_stat} | {self.tsuffix_title}') if\
@@ -1548,13 +1548,15 @@ class PlotConfiguration(object):
                 grid_lines=self.map_gridlines, **self.map_axes_conf)
 
             clevs_abs = self.get_clevs(np.array(dlist[0]), centered=False)
-            clevs_dif = self.get_clevs(np.array(dlist[1]), centered=True)
-
             fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
-            fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
+            clevs_dif = []
+            fmt_dif = []
+            if ndata > 0:
+                clevs_dif = self.get_clevs(np.array(dlist[1]), centered=True)
+                fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
-            clevs = [clevs_abs] + [clevs_dif]*ndata
-            fmt = [fmt_abs] + [fmt_dif]*ndata
+            clevs = [clevs_abs] + [clevs_dif] * ndata
+            fmt = [fmt_abs] + [fmt_dif] * ndata
 
             # Plot the maps
             mp = rpl.make_map_plot(
