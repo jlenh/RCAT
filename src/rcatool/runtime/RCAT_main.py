@@ -1531,7 +1531,6 @@ for stat in cdict['stats_conf']:
 print("\n=== SAVE OUTPUT ===")
 tres_str = {}
 for stat in cdict['stats_conf']:
-    stat_name = st.get_stat_name(stat)
     tres_str[stat] = {}
     resample_res = cdict['stats_conf'][stat]['resample resolution']
     for v in stats_dict[stat]:
