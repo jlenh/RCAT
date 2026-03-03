@@ -16,6 +16,43 @@ from copy import deepcopy
 #                                                          #
 ############################################################
 
+def get_stat_name(stat):
+    """Get statistics name from stats dictionary"""
+    # Available stat names from rcatool.runtime.RCAT_stats._stats
+    stat_keys = [
+        'generic',
+        'moments',
+        'seasonal cycle',
+        'annual cycle',
+        'diurnal cycle',
+        'dcycle harmonic',
+        'asop',
+        'eda',
+        'pdf',
+        'percentile',
+        'Rxx',
+        'cdd',
+        'pr survival fraction',
+        'signal filtering'
+    ]
+    stat_name = np.array([s in stat.replace("_", " ") for s in stat_keys])
+    if stat_name.sum() > 1:
+        msg = (f"Key '{stat}' is ambiguous. "
+            f"Reformat the key in the stats dictionary so that "
+            f"only one stat among {stat_keys} is used."
+        )
+        raise KeyError(msg)
+    elif stat_name.sum() == 0:
+        msg = (f"Key '{stat}' is ambiguous. "
+            f"Reformat the key in the stats dictionary so that "
+            f"at least one stat among {stat_keys} is used. "
+            f"Do not use other characters than '_' in the key name."
+        )
+        raise KeyError(msg)
+    else:
+        return stat_keys[stat_name.argmax()]
+
+
 def default_stats_config(stats):
     """
     The function returns a dictionary with default statistics configurations
@@ -158,8 +195,8 @@ def default_stats_config(stats):
             'cond analysis': None,
             'chunk dimension': 'space'},
             }
-
-    return {k: stats_dict[k] for k in stats}
+    stats_names = {k: get_stat_name(k) for k in stats}
+    return {k: stats_dict[stats_names[k]] for k in stats}
 
 
 def mod_stats_config(requested_stats):
@@ -216,8 +253,8 @@ def calc_statistics(data, var, stat, stat_config):
     Calculate statistics 'stat' according to configuration in 'stat_config'.
     This function calls the respective stat function (defined in _stats).
     """
-
-    stat_data = _stats(stat)(data, var, stat, stat_config)
+    stat_name = get_stat_name(stat)
+    stat_data = _stats(stat_name)(data, var, stat, stat_config)
     return stat_data
 
 
