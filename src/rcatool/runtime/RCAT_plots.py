@@ -369,8 +369,6 @@ class PlotConfiguration(object):
         else:
             dlist = [fmod_msk[self.ref_model][self.var].values[i, :]
                      for i in range(4)] +\
-                    [fmod_msk[m][self.var].values[i, :]
-                     for m in self.othr_mod for i in range(4)] +\
                     [fmod_msk[m][self.var].values[i, :] -
                      fmod_msk[self.ref_model][self.var].values[i, :]
                      for m in self.othr_mod for i in range(4)]
@@ -411,9 +409,9 @@ class PlotConfiguration(object):
 
             # color maps
             if self.var == 'pr':
-                cmap = [mpl.cm.YlGnBu]*(ndata + 1)*4 + [mpl.cm.BrBG]*ndata*4
+                cmap = [mpl.cm.YlGnBu]*4 + [mpl.cm.BrBG]*ndata*4
             else:
-                cmap = [mpl.cm.Spectral_r]*(ndata + 1)*4 + [mpl.cm.RdBu_r]*ndata*4
+                cmap = [mpl.cm.Spectral_r]*4 + [mpl.cm.RdBu_r]*ndata*4
 
             clevs_abs = self.get_clevs(np.array(dd[0:4]), centered=False)
             fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
@@ -421,13 +419,13 @@ class PlotConfiguration(object):
             fmt_dif = None
             if ndata > 0:
                 clevs_dif = self.get_clevs(
-                    np.array(dd[(ndata + 1)*4:(ndata + 2)*4]),
+                    np.array(dd[4:8]),
                     centered=True
                 )
                 fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
-            clevs = [clevs_abs]*(ndata + 1)*4 + [clevs_dif]*ndata*4
-            fmt = [fmt_abs]*(ndata + 1)*4 + [fmt_dif]*ndata*4
+            clevs = [clevs_abs]*4 + [clevs_dif]*ndata*4
+            fmt = [fmt_abs]*4 + [fmt_dif]*ndata*4
 
             rpl.figure_init(plottype='map')
 
