@@ -196,7 +196,7 @@ def default_stats_config(stats):
             'chunk dimension': 'space'},
             }
     stats_names = {k: get_stat_name(k) for k in stats}
-    return {k: stats_dict[stats_names[k]] for k in stats}
+    return {k: deepcopy(stats_dict[stats_names[k]]) for k in stats}
 
 
 def mod_stats_config(requested_stats):
@@ -217,7 +217,7 @@ def mod_stats_config(requested_stats):
                         "default_stats_config in stats_template "\
                         "module.".format(k, m)
                 try:
-                    stats_dd[k][m] = requested_stats[k][m]
+                    stats_dd[k][m] = requested_stats[k].get(m)
                 except KeyError:
                     print(msg)
 
@@ -454,31 +454,31 @@ def moments(data, var, stat, stat_config):
             if res_kw is None:
                 if mstat[1] == 'apply function':
                     expr = (f"data[var].resample(time='{mstat[0]}')"
-                            f".apply({mstat[2]}).dropna('time', 'all')")
+                            f".apply({mstat[2]}).dropna(dim='time', how='all')")
                 elif mstat[1] == 'interpolate':
                     expr = (f"data[var].resample(time='{mstat[0]}')"
-                            f".interpolate({mstat[2]}).dropna('time', 'all')")
+                            f".interpolate({mstat[2]}).dropna(dim='time', how='all')")
                 else:
                     if mstat[1] == 'sum':
                         expr = (f"data[var].resample(time='{mstat[0]}')"
-                                f".{mstat[1]}('time', min_count=1).dropna('time', 'all')")
+                                f".{mstat[1]}('time', min_count=1).dropna(dim='time', how='all')")
                     else:
                         expr = (f"data[var].resample(time='{mstat[0]}')"
-                                f".{mstat[1]}('time').dropna('time', 'all')")
+                                f".{mstat[1]}('time').dropna(dim='time', how='all')")
             else:
                 if mstat[1] == 'apply function':
                     expr = (f"data[var].resample(time='{mstat[0]}', **res_kw)"
-                            f".apply({mstat[2]}).dropna('time', 'all')")
+                            f".apply({mstat[2]}).dropna(dim='time', how='all')")
                 elif mstat[1] == 'interpolate':
                     expr = (f"data[var].resample(time='{mstat[0]}', **res_kw)"
-                            f".interpolate({mstat[2]}).dropna('time', 'all')")
+                            f".interpolate({mstat[2]}).dropna(dim='time', how='all')")
                 else:
                     if mstat[1] == 'sum':
                         expr = (f"data[var].resample(time='{mstat[0]}', **res_kw)"
-                                f".{mstat[1]}('time', min_count=1).dropna('time', 'all')")
+                                f".{mstat[1]}('time', min_count=1).dropna(dim='time', how='all')")
                     else:
                         expr = (f"data[var].resample(time='{mstat[0]}', **res_kw)"
-                                f".{mstat[1]}('time').dropna('time', 'all')")
+                                f".{mstat[1]}('time').dropna(dim='time', how='all')")
 
             diff = data.time.values[1] - data.time.values[0]
             nsec = to_timedelta(diff).total_seconds()
