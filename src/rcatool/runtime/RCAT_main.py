@@ -1027,8 +1027,6 @@ def save_to_disk(data, label, stat, odir, var, grid, time_suffix, stat_dict,
 
     if stat_name in ('annual cycle', 'seasonal cycle', 'diurnal cycle'):
         tstat = '_' + stat_dict['stat method'].replace(' ', '')
-    elif stat_name in ('moments'):
-        tstat = '_' + stat_dict['moment stat'][var][0]
     else:
         tstat = ''
     if stat_name in ('diurnal cycle'):
@@ -1036,9 +1034,11 @@ def save_to_disk(data, label, stat, odir, var, grid, time_suffix, stat_dict,
             stat_name.replace(' ', '_'),
             stat_dict['dcycle stat'])
     elif stat_name in ('moments'):
-        stat_fn = "{}_{}".format(
+        momstat = stat_dict['moment stat'][var] if isinstance(
+            stat_dict['moment stat'], dict) else stat_dict['moment stat']
+        stat_fn = "{}{}".format(
             stat_name.replace(' ', '_'),
-            stat_dict['moment stat'][var][1])
+            "_" + "_".join(momstat) if momstat is not None else '')
     else:
         stat_fn = stat_name.replace(' ', '_')
 
@@ -1048,13 +1048,13 @@ def save_to_disk(data, label, stat, odir, var, grid, time_suffix, stat_dict,
             data['regions'][r].attrs['Analysed time'] =\
                 f"{time_suffix.replace('_', ' ')}"
             fname = '{}_{}_{}_{}{}{}_{}_{}_{}.nc'.format(
-                label, stat_fn, var, thr, tres, tstat, rn, grid, time_suffix)
+                label, var, tres, thr, stat_fn, tstat, rn, grid, time_suffix)
             data['regions'][r] = clean_attrs_for_netcdf(data['regions'][r])
             data['regions'][r].to_netcdf(os.path.join(
                 odir, stat_name.replace(' ', '_'), fname), engine='netcdf4')
         if fulldomain:
             fname = '{}_{}_{}_{}{}{}_{}_{}.nc'.format(
-                label, stat_fn, var, thr, tres, tstat, grid, time_suffix)
+                label, var, tres, thr, stat_fn, tstat, grid, time_suffix)
             data['domain'].attrs['Analysed time'] =\
                 f"{time_suffix.replace('_', ' ')}"
             data['domain'] = clean_attrs_for_netcdf(data['domain'])
@@ -1062,7 +1062,7 @@ def save_to_disk(data, label, stat, odir, var, grid, time_suffix, stat_dict,
                 odir, stat_name.replace(' ', '_'), fname), engine='netcdf4')
     else:
         fname = '{}_{}_{}_{}{}{}_{}_{}.nc'.format(
-            label, stat_fn, var, thr, tres, tstat, grid, time_suffix)
+            label, var, tres, thr, stat_fn, tstat, grid, time_suffix)
         data['domain'].attrs['Analysed time'] =\
             f"{time_suffix.replace('_', ' ')}"
         data['domain'] = clean_attrs_for_netcdf(data['domain'])
@@ -1222,16 +1222,22 @@ def get_plot_dict(cdict, var, grid_coords, models, obs, tsuffix_dict, tres,
             stat_name.replace(' ', '_'),
             cdict['stats_conf'][stat]['dcycle stat'])
     elif stat_name == 'moments':
-        stnm = "{}_{}".format(
+        momstat = cdict['stats_conf'][stat]['moment stat'][var] if isinstance(
+            cdict['stats_conf'][stat]['moment stat'], dict) else\
+                cdict['stats_conf'][stat]['moment stat']
+        stnm = "{}{}".format(
             stat_name.replace(' ', '_'),
-            cdict['stats_conf'][stat]['moment stat'][var][1])
+            "_" + "_".join(momstat) if momstat is not None else '')
     else:
         stnm = stat_name.replace(' ', '_')
     if stat_name in ('annual cycle', 'seasonal cycle', 'diurnal cycle'):
         tstat = '_' + cdict['stats_conf'][stat]['stat method'].replace(
             ' ', '')
     elif stat_name == 'moments':
-        tstat = '_' + cdict['stats_conf'][stat]['moment stat'][var][0]
+        momstat = cdict['stats_conf'][stat]['moment stat'][var] if isinstance(
+            cdict['stats_conf'][stat]['moment stat'], dict) else\
+                cdict['stats_conf'][stat]['moment stat']
+        tstat = '_' + momstat[0] if momstat is not None else ''
     else:
         tstat = ''
     thrlg = (('thr' in cdict['stats_conf'][stat]) and
@@ -1244,18 +1250,18 @@ def get_plot_dict(cdict, var, grid_coords, models, obs, tsuffix_dict, tres,
 
     # Create dictionaries with list of files for models and obs
     _fm_list = {stat: [glob.glob(os.path.join(
-        stat_outdir, f'{stat_name.replace(' ', '_')}',
-        '{}_{}_{}_{}{}{}_{}_{}.nc'.format(
-            m, stnm, var, thrstr, tres[m], tstat, grdnme, tsuffix_dict[m])))
+        stat_outdir, f"{stat_name.replace(' ', '_')}",
+        "{}_{}_{}_{}{}{}_{}_{}.nc".format(
+            m, var, tres[m], thrstr, stnm, tstat, grdnme, tsuffix_dict[m])))
         for m in models]}
     fm_list = {s: [y for x in ll for y in x] for s, ll in _fm_list.items()}
 
     obs_list = [obs] if not isinstance(obs, list) else obs
     if obs is not None:
         _fo_list = {stat: [glob.glob(os.path.join(
-            stat_outdir, f'{stat_name.replace(' ', '_')}',
-            '{}_{}_{}_{}{}{}_{}_{}.nc'.format(
-                o, stnm, var, thrstr, tres[o], tstat, grdnme,
+            stat_outdir, f"{stat_name.replace(' ', '_')}",
+            "{}_{}_{}_{}{}{}_{}_{}.nc".format(
+                o, var, tres[o], thrstr, stnm, tstat, grdnme,
                 tsuffix_dict[o]))) for o in obs_list]}
         fo_list = {s: [y for x in ll for y in x] for s, ll in _fo_list.items()}
     else:
@@ -1291,18 +1297,18 @@ def get_plot_dict(cdict, var, grid_coords, models, obs, tsuffix_dict, tres,
     # Then also update plot dictionary
     if cdict['regions'] is not None:
         _fm_listr = {stat: {r:  [glob.glob(os.path.join(
-            stat_outdir, f'{stat_name.replace(' ', '_')}',
-            '{}_{}_{}_{}{}{}_{}_{}_{}.nc'.format(
-                m, stnm, var, thrstr, tres[m], tstat, r.replace(' ', '_'),
+            stat_outdir, f"{stat_name.replace(' ', '_')}",
+            "{}_{}_{}_{}{}{}_{}_{}_{}.nc".format(
+                m, var, tres[m], thrstr, stnm, tstat, r.replace(' ', '_'),
                 grdnme, tsuffix_dict[m])))
             for m in models] for r in cdict['regions']}}
         fm_listr = {s: {r: [y for x in _fm_listr[s][r] for y in x]
                         for r in _fm_listr[s]} for s in _fm_listr}
         if obs is not None:
             _fo_listr = {stat: {r: [glob.glob(os.path.join(
-                stat_outdir, f'{stat_name.replace(' ', '_')}',
-                '{}_{}_{}_{}{}{}_{}_{}_{}.nc'.format(
-                    o, stnm, var, thrstr, tres[o], tstat, r.replace(' ', '_'),
+                stat_outdir, f"{stat_name.replace(' ', '_')}",
+                "{}_{}_{}_{}{}{}_{}_{}_{}.nc".format(
+                    o, var, tres[o], thrstr, stnm, tstat, r.replace(' ', '_'),
                     grdnme, tsuffix_dict[o]))) for o in obs_list]
                 for r in cdict['regions']}}
             fo_listr = {s: {r: [y for x in _fo_listr[s][r] for y in x]
