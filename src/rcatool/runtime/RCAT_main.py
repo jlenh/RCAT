@@ -1317,22 +1317,9 @@ cdict = get_config_settings(config_file)
 stat_outdir = os.path.join(cdict['outdir'], 'stats')
 stat_names = [s.replace(' ', '_') for s in cdict['requested_stats']]
 img_outdir = os.path.join(cdict['outdir'], 'imgs')
-
-if os.path.exists(cdict['outdir']):
-    msg = ("\nOutput folder\n\n{}\n\nalready exists!\nDo you want "
-           "to overwrite? y/n: ".format(cdict['outdir']))
-    overwrite = "y"
-    if overwrite == 'y':
-        [os.makedirs(os.path.join(stat_outdir, t), exist_ok=True)
-         for t in stat_names]
-        [os.makedirs(os.path.join(img_outdir, t), exist_ok=True)
-         for t in stat_names]
-    else:
-        sys.exit()
-else:
-    [os.makedirs(os.path.join(stat_outdir, t)) for t in stat_names]
-    [os.makedirs(os.path.join(img_outdir, t)) for t in stat_names]
-
+for t in stat_names:
+    os.makedirs(os.path.join(stat_outdir, t), exist_ok=True)
+    os.makedirs(os.path.join(img_outdir, t), exist_ok=True)
 
 # Set up distributed client
 cluster_type = cdict['cluster type']
