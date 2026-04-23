@@ -12,6 +12,7 @@ from matplotlib.patches import Patch
 import math
 import re
 import rcatool.plot.plots as rpl
+import rcatool.runtime.RCAT_stats as st
 from rcatool.utils.polygons import mask_region
 from rcatool.stats.arithmetics import run_mean
 from copy import deepcopy
@@ -31,6 +32,7 @@ class PlotConfiguration(object):
 
         pdict = deepcopy(plotdict)
         self.statistic = statistic
+        self.statistic_name = st.get_stat_name(statistic)
 
         # Reference model and the rest
         self.models = pdict['models']
@@ -122,13 +124,13 @@ class PlotConfiguration(object):
         self.plot_mulc = 2 if self.include_relative_change else 1
 
         # Call plot function
-        plot_funcs[self.statistic]()
+        plot_funcs[self.statistic_name]()
 
     def _map_grid_setup(self, map_grid_set):
         """
         Potentially modify map grid settings for map plots
         """
-        if self.statistic in ('annual cycle', 'diurnal cycle', 'asop'):
+        if self.statistic_name in ('annual cycle', 'diurnal cycle', 'asop'):
             if 'cbar_mode' not in map_grid_set:
                 map_grid_set.update({'cbar_mode': 'single'})
                 map_grid_set.update({'cbar_location': 'right'})
@@ -136,7 +138,7 @@ class PlotConfiguration(object):
                 map_grid_set.update({'cbar_pad': 0.06})
             if 'axes_pad' not in map_grid_set:
                 map_grid_set.update({'axes_pad': 0.1})
-        if self.statistic in ('seasonal cycle'):
+        if self.statistic_name in ('seasonal cycle'):
             if 'cbar_mode' not in map_grid_set:
                 map_grid_set.update({'cbar_mode': 'edge'})
                 map_grid_set.update({'cbar_location': 'right'})
@@ -144,7 +146,7 @@ class PlotConfiguration(object):
                 map_grid_set.update({'cbar_pad': 0.04})
             if 'axes_pad' not in map_grid_set:
                 map_grid_set.update({'axes_pad': 0.1})
-        if self.statistic in ('percentile'):
+        if self.statistic_name in ('percentile'):
             if 'cbar_mode' not in map_grid_set:
                 map_grid_set.update({'cbar_mode': 'single'})
                 map_grid_set.update({'cbar_location': 'right'})
@@ -296,7 +298,7 @@ class PlotConfiguration(object):
             ref_name = self.ref_model
             data_name_list = self.othr_mod
 
-        if self.statistic == 'asop':
+        if self.statistic_name == 'asop':
             ftitles = [(f"{m.upper()} {self.time_suffix_dd[m]} -\n "
                         f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}")
                        for m in data_name_list]

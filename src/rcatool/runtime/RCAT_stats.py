@@ -16,6 +16,43 @@ from copy import deepcopy
 #                                                          #
 ############################################################
 
+def get_stat_name(stat):
+    """Get statistics name from stats dictionary"""
+    # Available stat names from rcatool.runtime.RCAT_stats._stats
+    stat_keys = [
+        'generic',
+        'moments',
+        'seasonal cycle',
+        'annual cycle',
+        'diurnal cycle',
+        'dcycle harmonic',
+        'asop',
+        'eda',
+        'pdf',
+        'percentile',
+        'Rxx',
+        'cdd',
+        'pr survival fraction',
+        'signal filtering'
+    ]
+    stat_name = np.array([s in stat.replace("_", " ") for s in stat_keys])
+    if stat_name.sum() > 1:
+        msg = (f"Key '{stat}' is ambiguous. "
+            f"Reformat the key in the stats dictionary so that "
+            f"only one stat among {stat_keys} is used."
+        )
+        raise KeyError(msg)
+    elif stat_name.sum() == 0:
+        msg = (f"Key '{stat}' is ambiguous. "
+            f"Reformat the key in the stats dictionary so that "
+            f"at least one stat among {stat_keys} is used. "
+            f"Do not use other characters than '_' in the key name."
+        )
+        raise KeyError(msg)
+    else:
+        return stat_keys[stat_name.argmax()]
+
+
 def default_stats_config(stats):
     """
     The function returns a dictionary with default statistics configurations
@@ -158,8 +195,8 @@ def default_stats_config(stats):
             'cond analysis': None,
             'chunk dimension': 'space'},
             }
-
-    return {k: stats_dict[k] for k in stats}
+    stats_names = {k: get_stat_name(k) for k in stats}
+    return {k: deepcopy(stats_dict[stats_names[k]]) for k in stats}
 
 
 def mod_stats_config(requested_stats):
@@ -180,7 +217,7 @@ def mod_stats_config(requested_stats):
                         "default_stats_config in stats_template "\
                         "module.".format(k, m)
                 try:
-                    stats_dd[k][m] = requested_stats[k][m]
+                    stats_dd[k][m] = requested_stats[k].get(m)
                 except KeyError:
                     print(msg)
 
@@ -216,8 +253,8 @@ def calc_statistics(data, var, stat, stat_config):
     Calculate statistics 'stat' according to configuration in 'stat_config'.
     This function calls the respective stat function (defined in _stats).
     """
-
-    stat_data = _stats(stat)(data, var, stat, stat_config)
+    stat_name = get_stat_name(stat)
+    stat_data = _stats(stat_name)(data, var, stat, stat_config)
     return stat_data
 
 
@@ -417,31 +454,31 @@ def moments(data, var, stat, stat_config):
             if res_kw is None:
                 if mstat[1] == 'apply function':
                     expr = (f"data[var].resample(time='{mstat[0]}')"
-                            f".apply({mstat[2]}).dropna('time', 'all')")
+                            f".apply({mstat[2]}).dropna(dim='time', how='all')")
                 elif mstat[1] == 'interpolate':
                     expr = (f"data[var].resample(time='{mstat[0]}')"
-                            f".interpolate({mstat[2]}).dropna('time', 'all')")
+                            f".interpolate({mstat[2]}).dropna(dim='time', how='all')")
                 else:
                     if mstat[1] == 'sum':
                         expr = (f"data[var].resample(time='{mstat[0]}')"
-                                f".{mstat[1]}('time', min_count=1).dropna('time', 'all')")
+                                f".{mstat[1]}('time', min_count=1).dropna(dim='time', how='all')")
                     else:
                         expr = (f"data[var].resample(time='{mstat[0]}')"
-                                f".{mstat[1]}('time').dropna('time', 'all')")
+                                f".{mstat[1]}('time').dropna(dim='time', how='all')")
             else:
                 if mstat[1] == 'apply function':
                     expr = (f"data[var].resample(time='{mstat[0]}', **res_kw)"
-                            f".apply({mstat[2]}).dropna('time', 'all')")
+                            f".apply({mstat[2]}).dropna(dim='time', how='all')")
                 elif mstat[1] == 'interpolate':
                     expr = (f"data[var].resample(time='{mstat[0]}', **res_kw)"
-                            f".interpolate({mstat[2]}).dropna('time', 'all')")
+                            f".interpolate({mstat[2]}).dropna(dim='time', how='all')")
                 else:
                     if mstat[1] == 'sum':
                         expr = (f"data[var].resample(time='{mstat[0]}', **res_kw)"
-                                f".{mstat[1]}('time', min_count=1).dropna('time', 'all')")
+                                f".{mstat[1]}('time', min_count=1).dropna(dim='time', how='all')")
                     else:
                         expr = (f"data[var].resample(time='{mstat[0]}', **res_kw)"
-                                f".{mstat[1]}('time').dropna('time', 'all')")
+                                f".{mstat[1]}('time').dropna(dim='time', how='all')")
 
             diff = data.time.values[1] - data.time.values[0]
             nsec = to_timedelta(diff).total_seconds()
