@@ -678,7 +678,7 @@ class PlotConfiguration(object):
             self.include_relative_change else ll_abs + ll_diff
 
         # figure settings
-        figsize = (18, 14)
+        figsize = (18, 9)
         figshape = (3, 4)
 
         # color maps
@@ -726,7 +726,7 @@ class PlotConfiguration(object):
             range(ndata * self.plot_mulc + 1),
             ftitles, data_names, fn_stat_names, units
         ):
-            headtitle = f'{ft} | {self.var} [{uts}]'\
+            headtitle = f'{ft} | {self.tstat.strip("_")}{self.var} [{uts}]'\
                     if thr == 'None' else\
                     f'{ft} | {self.var} [{uts}] | Threshold: {thr}'
 
