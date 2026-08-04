@@ -1027,6 +1027,11 @@ def save_to_disk(data, label, stat, odir, var, grid, time_suffix, stat_dict,
 
     if stat_name in ('annual cycle', 'seasonal cycle', 'diurnal cycle'):
         tstat = '_' + stat_dict['stat method'].replace(' ', '')
+    elif stat_name == 'moments':
+        momstat = cdict['stats_conf'][stat]['moment stat'][var] if isinstance(
+            cdict['stats_conf'][stat]['moment stat'], dict) else\
+                cdict['stats_conf'][stat]['moment stat']
+        tstat = '_' + momstat[0] if momstat is not None else ''
     else:
         tstat = ''
     if stat_name in ('diurnal cycle'):
