@@ -619,6 +619,11 @@ class PlotConfiguration(object):
                 for m, f in zip(self.models, self.fm_list)}
         fmod_msk = {m: self._mask_data(ds) for m, ds in fmod.items()}
 
+        # In case of only one model as input and no comparison
+        #   = do not include relative change.
+        if not (self.othr_mod or (self.ref_obs is not None)):
+            self.include_relative_change = False
+
         if self.ref_obs is not None:
             fobs = {o: xa.open_dataset(f)
                     for o, f in zip(self.obslist, self.fo_list)}
@@ -675,34 +680,42 @@ class PlotConfiguration(object):
             self.include_relative_change else ll_abs + ll_diff
 
         # figure settings
-        figsize = (18, 14)
+        figsize = (18, 9)
         figshape = (3, 4)
 
         # color maps
         if self.var == 'pr':
-            cmap = [mpl.cm.YlGnBu] + [mpl.cm.BrBG]*ndata*self.plot_mulc
+            cmap = [mpl.cm.YlGnBu] + [mpl.cm.BrBG] * ndata * self.plot_mulc
         else:
-            cmap = [mpl.cm.Spectral_r] + [mpl.cm.RdBu_r]*ndata*self.plot_mulc
+            cmap = [mpl.cm.Spectral_r] +\
+                [mpl.cm.RdBu_r] * ndata * self.plot_mulc
 
         clevs_abs = self.get_clevs(np.array(dlist[0]), centered=False)
-        clevs_dif = self.get_clevs(np.array(dlist[1]), centered=True)
         fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
-        fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
+        clevs_dif = []
+        fmt_dif = []
+        if ndata > 0:
+            clevs_dif = self.get_clevs(
+                np.array(dlist[1]), centered=True)
+            fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
         if self.include_relative_change:
-            clevs_rel = self.get_clevs(np.array(dlist[1+ndata]), centered=True)
+            clevs_rel = self.get_clevs(
+                np.array(dlist[1 + ndata]), centered=True)
             fmt_rel = self._get_colorbar_label_formatting(clevs_rel[::2])
-            clevs = [clevs_abs] + [clevs_dif]*ndata + [clevs_rel]*ndata
-            fmt = [fmt_abs] + [fmt_dif]*ndata + [fmt_rel]*ndata
+            clevs = [clevs_abs] + [clevs_dif] * ndata +\
+                [clevs_rel] * ndata
+            fmt = [fmt_abs] + [fmt_dif] * ndata +\
+                [fmt_rel] * ndata
         else:
-            clevs = [clevs_abs] + [clevs_dif]*ndata
-            fmt = [fmt_abs] + [fmt_dif]*ndata
+            clevs = [clevs_abs] + [clevs_dif] * ndata
+            fmt = [fmt_abs] + [fmt_dif] * ndata
 
         thr = fmod_msk[self.ref_model].attrs['Description'].\
             split('|')[2].split(':')[1].strip()
-        units = [self.units] * (ndata + 1)
-        fn_stat_names = [None] + [(f"{self.statistic.replace(' ', '_')}"
-                                   f"_abs_diff")] * ndata
+        units = [self.units] * (1 + ndata)
+        fn_stat_names = [None] +\
+            [(f"{self.statistic.replace(' ', '_')}_abs_diff")] * ndata
         ftitles = self.define_figure_titles()
 
         if self.include_relative_change:
@@ -711,10 +724,11 @@ class PlotConfiguration(object):
             units = units + ["%"] * ndata
 
         # Loop over data sets
-        for p, ft, data_name, st_nme, uts in zip(range(ndata*self.plot_mulc+1),
-                                                 ftitles, data_names,
-                                                 fn_stat_names, units):
-            headtitle = f'{ft} | {self.var} [{uts}]'\
+        for p, ft, data_name, st_nme, uts in zip(
+            range(ndata * self.plot_mulc + 1),
+            ftitles, data_names, fn_stat_names, units
+        ):
+            headtitle = f'{ft} | {self.tstat.strip("_")}{self.var} [{uts}]'\
                     if thr == 'None' else\
                     f'{ft} | {self.var} [{uts}] | Threshold: {thr}'
 
