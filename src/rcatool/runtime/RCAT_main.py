@@ -212,9 +212,13 @@ def get_mod_data(model, mconf, tres, var, varnames, factor, offset, deacc):
             readvar = var
     else:
         readvar = var
+    
+    # Add model version if necessary
+    mod_vers = mconf['version']
+    mod_vers = f'{mod_vers}/' if mod_vers is not None else ''
 
     file_path = os.path.join(mconf['fpath'],
-                             f'{tres}/{readvar}/{readvar}_*.nc')
+                             f'{tres}/{readvar}/{mod_vers}{readvar}_*.nc')
     _flist = glob.glob(file_path)
 
     errmsg = (f"Could not find any files at specified location:\n{file_path}")
@@ -1294,6 +1298,7 @@ def get_plot_dict(cdict, var, grid_coords, models, obs, tsuffix_dict, tres,
         'line grid setup': cdict['line grid setup'],
         'line kwargs': cdict['line kwargs'],
         'regions': cdict['regions'],
+        'full domain': cdict['full domain'],
         'time suffix dict': tsuffix_dict,
         'img dir': os.path.join(img_outdir, stat_name.replace(' ', '_'))
     }
@@ -1352,7 +1357,7 @@ img_outdir = os.path.join(cdict['outdir'], 'imgs')
 if os.path.exists(cdict['outdir']):
     msg = ("\nOutput folder\n\n{}\n\nalready exists!\nDo you want "
            "to overwrite? y/n: ".format(cdict['outdir']))
-    overwrite = input(msg)
+    overwrite = 'y'
     if overwrite == 'y':
         [os.makedirs(os.path.join(stat_outdir, t), exist_ok=True)
          for t in stat_names]

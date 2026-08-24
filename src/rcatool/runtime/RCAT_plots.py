@@ -61,6 +61,7 @@ class PlotConfiguration(object):
 
         self.regions = pdict['regions']
         self.img_dir = pdict['img dir']
+        self.full_domain = pdict['full domain']
 
         # Map settings
         self.map_projection = pdict['map projection']
@@ -303,8 +304,10 @@ class PlotConfiguration(object):
                         f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}")
                        for m in data_name_list]
         else:
-            ftitles = [f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}"]\
-                + [(f"{m.upper()} {self.time_suffix_dd[m]} -\n "
+            ftitles = [f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}"]+\
+                [f"{m.upper()} {self.time_suffix_dd[m]}"
+                 for m in data_name_list] +\
+                [(f"{m.upper()} {self.time_suffix_dd[m]} -\n "
                     f"{ref_name.upper()} {self.time_suffix_dd[ref_name]}")
                     for m in data_name_list] * self.plot_mulc
         ftitles = [ft.replace('_', ' ') for ft in ftitles]
@@ -371,6 +374,8 @@ class PlotConfiguration(object):
         else:
             dlist = [fmod_msk[self.ref_model][self.var].values[i, :]
                      for i in range(4)] +\
+                    [fmod_msk[m][self.var].values[i, :]
+                     for m in self.othr_mod for i in range(4)] +\
                     [fmod_msk[m][self.var].values[i, :] -
                      fmod_msk[self.ref_model][self.var].values[i, :]
                      for m in self.othr_mod for i in range(4)]
@@ -381,7 +386,7 @@ class PlotConfiguration(object):
                         [(fmod_msk[m][self.var].values[i, :] /
                          fmod_msk[self.ref_model][self.var].values[i, :]
                          - 1)*100 for m in self.othr_mod for i in range(4)]
-            ndata = self.nmod-1
+            ndata = self.nmod - 1
 
         data_list = [dlist, dlist_rel] if\
             self.include_relative_change else [dlist]
@@ -411,17 +416,20 @@ class PlotConfiguration(object):
 
             # color maps
             if self.var == 'pr':
-                cmap = [mpl.cm.YlGnBu]*4 + [mpl.cm.BrBG]*ndata*4
+                cmap = [mpl.cm.YlGnBu]*(ndata + 1)*4 + [mpl.cm.BrBG]*ndata*4
             else:
-                cmap = [mpl.cm.Spectral_r]*4 + [mpl.cm.RdBu_r]*ndata*4
+                cmap = [mpl.cm.Spectral_r]*(ndata + 1)*4 + [mpl.cm.RdBu_r]*ndata*4
 
             clevs_abs = self.get_clevs(np.array(dd[0:4]), centered=False)
-            clevs_dif = self.get_clevs(np.array(dd[4:8]), centered=True)
             fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
-            fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
+            clevs_dif = None
+            fmt_dif = None
+            if ndata > 0:
+                clevs_dif = self.get_clevs(np.array(dd[(ndata + 1)*4:(ndata + 2)*4]), centered=True)
+                fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
-            clevs = [clevs_abs]*4 + [clevs_dif]*ndata*4
-            fmt = [fmt_abs]*4 + [fmt_dif]*ndata*4
+            clevs = [clevs_abs]*(ndata + 1)*4 + [clevs_dif]*ndata*4
+            fmt = [fmt_abs]*(ndata + 1)*4 + [fmt_dif]*ndata*4
 
             rpl.figure_init(plottype='map')
 
@@ -619,13 +627,20 @@ class PlotConfiguration(object):
                 for m, f in zip(self.models, self.fm_list)}
         fmod_msk = {m: self._mask_data(ds) for m, ds in fmod.items()}
 
+        # In case of only one model as input and no comparison
+        #   = do not include relative change.
+        if not (self.othr_mod or (self.ref_obs is not None)):
+            self.include_relative_change = False
+
         if self.ref_obs is not None:
             fobs = {o: xa.open_dataset(f)
                     for o, f in zip(self.obslist, self.fo_list)}
             fobs_msk = {o: self._mask_data(ds) for o, ds in fobs.items()}
 
             ll_abs = [[fobs_msk[self.ref_obs][self.var].values[i, :]
-                       for i in range(12)]]
+                       for i in range(12)]] +\
+                     [[fmod_msk[m][self.var].values[i, :]
+                       for i in range(12)] for m in self.models]
             ll_diff = [[fmod_msk[m][self.var].values[i, :] -
                         fobs_msk[self.ref_obs][self.var].values[i, :]
                         for i in range(12)] for m in self.models]
@@ -646,18 +661,23 @@ class PlotConfiguration(object):
                         for o in self.obslist[1:]]
             if len(self.obslist) > 1:
                 ndata = (self.nmod + len(self.obslist[1:]))
-                data_names = [self.ref_obs] + [
-                    f"{m}-{self.ref_obs}"
-                    for m in self.models + self.obslist[1:]] * self.plot_mulc
+                nabs = self.nmod + 1
+                data_names = [self.ref_obs] +\
+                    [m for m in self.models] +\
+                    [f"{m}-{self.ref_obs}"
+                     for m in self.models + self.obslist[1:]] * self.plot_mulc
             else:
                 ndata = self.nmod
+                nabs = self.nmod + 1
                 data_names = [self.ref_obs] +\
+                    [m for m in self.models] +\
                     [f"{m}-{self.ref_obs}" for m in self.models] *\
                     self.plot_mulc
         else:
             ll_abs = [[fmod_msk[self.ref_model][self.var].values[i, :]
-                       for i in range(12)]]
-
+                       for i in range(12)]] +\
+                     [[fmod_msk[m][self.var].values[i, :]
+                       for i in range(12)] for m in self.othr_mod]
             ll_diff = [[fmod_msk[m][self.var].values[i, :] -
                         fmod_msk[self.ref_model][self.var].values[i, :]
                         for i in range(12)] for m in self.othr_mod]
@@ -667,42 +687,55 @@ class PlotConfiguration(object):
                       fmod_msk[self.ref_model][self.var].values[i, :] - 1)*100
                      for i in range(12)] for m in self.othr_mod]
             ndata = (self.nmod - 1)
+            nabs = self.nmod
             data_names = [self.ref_model.upper()] +\
+                [m for m in self.othr_mod] +\
                 [f"{m}-{self.ref_model.upper()}"
                  for m in self.othr_mod] * self.plot_mulc
 
+        # datasets = (nabs) abs + (ndata) diff + (ndata) diff_rel
         dlist = ll_abs + ll_diff + ll_diff_rel if\
             self.include_relative_change else ll_abs + ll_diff
+        ndata_tot = nabs + ndata * self.plot_mulc
 
         # figure settings
-        figsize = (18, 14)
+        figsize = (18, 9)
         figshape = (3, 4)
 
         # color maps
         if self.var == 'pr':
-            cmap = [mpl.cm.YlGnBu] + [mpl.cm.BrBG]*ndata*self.plot_mulc
+            cmap = [mpl.cm.YlGnBu] * nabs +\
+                [mpl.cm.BrBG] * ndata * self.plot_mulc
         else:
-            cmap = [mpl.cm.Spectral_r] + [mpl.cm.RdBu_r]*ndata*self.plot_mulc
+            cmap = [mpl.cm.Spectral_r] * nabs +\
+                [mpl.cm.RdBu_r] * ndata * self.plot_mulc
 
         clevs_abs = self.get_clevs(np.array(dlist[0]), centered=False)
-        clevs_dif = self.get_clevs(np.array(dlist[1]), centered=True)
         fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
-        fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
+        clevs_dif = []
+        fmt_dif = []
+        if ndata > 0:
+            clevs_dif = self.get_clevs(
+                np.array(dlist[nabs]), centered=True)
+            fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
         if self.include_relative_change:
-            clevs_rel = self.get_clevs(np.array(dlist[1+ndata]), centered=True)
+            clevs_rel = self.get_clevs(
+                np.array(dlist[nabs + ndata]), centered=True)
             fmt_rel = self._get_colorbar_label_formatting(clevs_rel[::2])
-            clevs = [clevs_abs] + [clevs_dif]*ndata + [clevs_rel]*ndata
-            fmt = [fmt_abs] + [fmt_dif]*ndata + [fmt_rel]*ndata
+            clevs = [clevs_abs] * nabs + [clevs_dif] * ndata +\
+                [clevs_rel] * ndata
+            fmt = [fmt_abs] * nabs + [fmt_dif] * ndata +\
+                [fmt_rel] * ndata
         else:
-            clevs = [clevs_abs] + [clevs_dif]*ndata
-            fmt = [fmt_abs] + [fmt_dif]*ndata
+            clevs = [clevs_abs] * nabs + [clevs_dif] * ndata
+            fmt = [fmt_abs] * nabs + [fmt_dif] * ndata
 
         thr = fmod_msk[self.ref_model].attrs['Description'].\
             split('|')[2].split(':')[1].strip()
-        units = [self.units] * (ndata + 1)
-        fn_stat_names = [None] + [(f"{self.statistic.replace(' ', '_')}"
-                                   f"_abs_diff")] * ndata
+        units = [self.units] * (nabs + ndata)
+        fn_stat_names = [None] * nabs +\
+            [(f"{self.statistic.replace(' ', '_')}_abs_diff")] * ndata
         ftitles = self.define_figure_titles()
 
         if self.include_relative_change:
@@ -711,12 +744,12 @@ class PlotConfiguration(object):
             units = units + ["%"] * ndata
 
         # Loop over data sets
-        for p, ft, data_name, st_nme, uts in zip(range(ndata*self.plot_mulc+1),
-                                                 ftitles, data_names,
-                                                 fn_stat_names, units):
+        for p, ft, data_name, st_nme, uts in zip(
+            range(ndata_tot), ftitles, data_names, fn_stat_names, units
+        ):
             headtitle = f'{ft} | {self.var} [{uts}]'\
-                    if thr == 'None' else\
-                    f'{ft} | {self.var} [{uts}] | Threshold: {thr}'
+                if thr == 'None' else\
+                f'{ft} | {self.var} [{uts}] | Threshold: {thr}'
 
             fn = self.define_file_names(
                 thr, 'map', data_name=data_name, stat_name=st_nme)
@@ -1498,6 +1531,8 @@ class PlotConfiguration(object):
                          fobs_msk[self.ref_obs][self.var].values
                          for m in self.models]
 
+                nabs = 1
+
                 if len(self.obslist) > 1:
                     dlist += [fobs_msk[o][self.var].values -
                               fobs_msk[self.ref_obs][self.var].values
@@ -1507,10 +1542,11 @@ class PlotConfiguration(object):
                     ndata = self.nmod
             else:
                 dlist = [fmod_msk[self.ref_model][self.var].values] +\
+                        [fmod_msk[m][self.var].values for m in self.othr_mod] +\
                         [fmod_msk[m][self.var].values -
                          fmod_msk[self.ref_model][self.var].values
                          for m in self.othr_mod]
-                ndata = self.nmod-1
+                ndata = self.nmod - 1
 
             ftitles = self.define_figure_titles()
 
@@ -1524,12 +1560,15 @@ class PlotConfiguration(object):
                 figsize = (18, 12)
             else:
                 figsize = (20, 10)
-            figshape = (1, ndata+1)
+            if self.othr_mod or (self.ref_obs is not None):
+                figshape = (1, ndata+1)
+            else:
+                figshape = (1, 1)
 
             if self.var == 'pr':
-                cmap = [mpl.cm.YlGnBu] + [mpl.cm.BrBG]*ndata
+                cmap = [mpl.cm.YlGnBu] * (ndata + 1) + [mpl.cm.BrBG]*ndata
             else:
-                cmap = [mpl.cm.Spectral_r] + [mpl.cm.RdBu_r]*ndata
+                cmap = [mpl.cm.Spectral_r] * (ndata + 1) + [mpl.cm.RdBu_r]*ndata
 
             headtitle = (f'{self.var} [{self.units}] | Stat: '
                          f'{moment_stat} | {self.tsuffix_title}') if\
@@ -1550,12 +1589,14 @@ class PlotConfiguration(object):
                 grid_lines=self.map_gridlines, **self.map_axes_conf)
 
             clevs_abs = self.get_clevs(np.array(dlist[0]), centered=False)
-            clevs_dif = self.get_clevs(np.array(dlist[1]), centered=True)
-
             fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
-            fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
-            clevs = [clevs_abs] + [clevs_dif]*ndata
+            clevs_dif = None
+            fmt_dif = None
+            if ndata > 0:
+                clevs_dif = self.get_clevs(np.array(dlist[ndata + 2]), centered=True)
+                fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
+            clevs = [clevs_abs] * (ndata + 1) + [clevs_dif]*ndata
             fmt = [fmt_abs] + [fmt_dif]*ndata
 
             # Plot the maps
@@ -1577,6 +1618,108 @@ class PlotConfiguration(object):
         """
         Plotting frequency-intensity-distribution plot
         """
+
+        if self.full_domain:
+
+            reg = 'full_domain'
+
+            fmod = {m: xa.open_dataset(f)
+                    for m, f in zip(self.models, self.fm_list)}
+            mod_data = {m: np.nanmean(
+                fmod[m][self.var].values*100, axis=(1, 2))
+                        for m in self.models}
+
+            bins = fmod[self.ref_model].bin_edges.values[1:]
+            nbins = bins.size
+
+            if self.ref_obs is not None:
+                fobs = {o: xa.open_dataset(f)
+                        for o, f in zip(self.obslist, self.fo_listr[reg])}
+                obs_data = {o: np.nanmean(
+                    fobs[o][self.var].values*100, axis=(1, 2))
+                            for o in self.obslist}
+                dlist = [[obs_data[self.ref_obs]] +
+                         [mod_data[m] for m in self.models],
+                         [mod_data[m] - obs_data[self.ref_obs]
+                          for m in self.models]]
+
+                if len(self.obslist) > 1:
+                    dlist[0] += [obs_data[o] for o in self.obslist[1:]]
+                    dlist[1] += [obs_data[o] - obs_data[self.ref_obs]
+                                 for o in self.obslist[1:]]
+                    ll_nms = self.models + self.obslist[1:]
+                else:
+                    ll_nms = self.models
+                lg_lbls = [[self.ref_obs] + [m.upper() for m in ll_nms],
+                           [f'{m.upper()} - {self.ref_obs}' for m in ll_nms]]
+            else:
+                dlist = [[mod_data[m] for m in self.models],
+                         [mod_data[m] - mod_data[self.ref_model]
+                          for m in self.othr_mod]]
+                lg_lbls = [[m.upper() for m in self.models],
+                           [f'{m.upper()} - {self.ref_model.upper()}'
+                            for m in self.othr_mod]]
+
+            # In case of only one model as input and no comparison
+            #   = unlist the array corresponding to the dataset.
+            if not (self.othr_mod or (self.ref_obs is not None)):
+                dlist[0] = dlist[0][0]
+
+            thr = fmod[self.ref_model].attrs['Description'].\
+                split('|')[1].split(':')[1].strip()
+            regnm = reg.replace(' ', '_')
+
+            headtitle = f'{self.var} |  {reg} | {self.tsuffix_title}'\
+                if thr != 'None' else\
+                f'{self.var} |  Threshold: {thr}\n{reg} | {self.tsuffix_title}'
+
+            fn = self.define_file_names(thr, 'lnplot', region=reg)
+
+            # figure settings
+            figsize = (19, 8) if self.othr_mod or (self.ref_obs is not None) else (10, 8)
+            figshape = (1, 2) if self.othr_mod or (self.ref_obs is not None) else (1, 1)
+
+            ylabel = ['Frequency (%)', 'Difference']
+            ylim = [None]*2
+            xlabel = ['({})'.format(self.units)]*2
+            xlim = [[-.5, nbins-.5]]*2
+            xticks = range(nbins)[::6]
+            xtlbls = bins[::6]
+
+            rpl.figure_init(plottype='scatter')
+            fig, lgrid = rpl.fig_grid_setup(fshape=figshape, figsize=figsize,
+                                            **self.line_grid)
+            axs = rpl.make_line_plot(lgrid, ydata=dlist, **self.line_sets)
+            if self.var == 'pr':
+                axs[0].set_yscale('log')
+
+            [ln.set_color(lc) for ln, lc in zip(
+                list(axs[0].get_lines())[:len(dlist[0])], self.abs_colors)]
+            if self.othr_mod or (self.ref_obs is not None):
+                [ln.set_color(lc) for ln, lc in zip(
+                    list(axs[1].get_lines())[:len(dlist[1])], self.rel_colors)]
+
+            # Legend
+            legend_elements = [Line2D([0], [0], lw=2, color=c, label=l)
+                               for c, l in zip(self.abs_colors, lg_lbls[0])]
+            axs[0].legend(handles=legend_elements,
+                          fontsize='x-large', framealpha=.5)
+            if self.othr_mod or (self.ref_obs is not None):
+                legend_elements = [
+                    Line2D([0], [0], lw=2, color=c, label=l)
+                    for c, l in zip(self.rel_colors, lg_lbls[1])]
+                axs[1].legend(handles=legend_elements,
+                              fontsize='x-large', framealpha=.5)
+
+            [rpl.axes_settings(ax, xlabel=xlabel[a], xticks=xticks,
+                               ylabel=ylabel[a], xtlabels=xtlbls,
+                               xlim=xlim[a], ylim=ylim[a])
+             for a, ax in enumerate(axs)]
+
+            ttl = fig.suptitle(headtitle, fontsize='xx-large')
+            ttl.set_position((.5, 1.08))
+
+            plt.savefig(os.path.join(self.img_dir, fn), bbox_inches='tight')            
 
         for reg in self.regions:
 
@@ -1616,6 +1759,11 @@ class PlotConfiguration(object):
                            [f'{m.upper()} - {self.ref_model.upper()}'
                             for m in self.othr_mod]]
 
+            # In case of only one model as input and no comparison
+            #   = unlist the array corresponding to the dataset.
+            if not (self.othr_mod or (self.ref_obs is not None)):
+                dlist[0] = dlist[0][0]
+
             thr = fmod[self.ref_model].attrs['Description'].\
                 split('|')[1].split(':')[1].strip()
             regnm = reg.replace(' ', '_')
@@ -1627,8 +1775,8 @@ class PlotConfiguration(object):
             fn = self.define_file_names(thr, 'lnplot', region=regnm)
 
             # figure settings
-            figsize = (19, 8)
-            figshape = (1, 2)
+            figsize = (19, 8) if self.othr_mod or (self.ref_obs is not None) else (9, 8)
+            figshape = (1, 2) if self.othr_mod or (self.ref_obs is not None) else (1, 1)
 
             ylabel = ['Frequency (%)', 'Difference']
             ylim = [None]*2
@@ -1646,18 +1794,20 @@ class PlotConfiguration(object):
 
             [ln.set_color(lc) for ln, lc in zip(
                 list(axs[0].get_lines())[:len(dlist[0])], self.abs_colors)]
-            [ln.set_color(lc) for ln, lc in zip(
-                list(axs[1].get_lines())[:len(dlist[1])], self.rel_colors)]
+            if self.othr_mod or (self.ref_obs is not None):
+                [ln.set_color(lc) for ln, lc in zip(
+                    list(axs[1].get_lines())[:len(dlist[1])], self.rel_colors)]
 
             # Legend
             legend_elements = [Line2D([0], [0], lw=2, color=c, label=l)
                                for c, l in zip(self.abs_colors, lg_lbls[0])]
             axs[0].legend(handles=legend_elements,
                           fontsize='x-large', framealpha=.5)
-            legend_elements = [Line2D([0], [0], lw=2, color=c, label=l)
-                               for c, l in zip(self.rel_colors, lg_lbls[1])]
-            axs[1].legend(handles=legend_elements,
-                          fontsize='x-large', framealpha=.5)
+            if self.othr_mod or (self.ref_obs is not None):
+                legend_elements = [Line2D([0], [0], lw=2, color=c, label=l)
+                                for c, l in zip(self.rel_colors, lg_lbls[1])]
+                axs[1].legend(handles=legend_elements,
+                            fontsize='x-large', framealpha=.5)
 
             [rpl.axes_settings(ax, xlabel=xlabel[a], xticks=xticks,
                                ylabel=ylabel[a], xtlabels=xtlbls,
