@@ -381,7 +381,7 @@ class PlotConfiguration(object):
                         [(fmod_msk[m][self.var].values[i, :] /
                          fmod_msk[self.ref_model][self.var].values[i, :]
                          - 1)*100 for m in self.othr_mod for i in range(4)]
-            ndata = self.nmod-1
+            ndata = self.nmod - 1
 
         data_list = [dlist, dlist_rel] if\
             self.include_relative_change else [dlist]
@@ -416,9 +416,15 @@ class PlotConfiguration(object):
                 cmap = [mpl.cm.Spectral_r]*4 + [mpl.cm.RdBu_r]*ndata*4
 
             clevs_abs = self.get_clevs(np.array(dd[0:4]), centered=False)
-            clevs_dif = self.get_clevs(np.array(dd[4:8]), centered=True)
             fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
-            fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
+            clevs_dif = None
+            fmt_dif = None
+            if ndata > 0:
+                clevs_dif = self.get_clevs(
+                    np.array(dd[4:8]),
+                    centered=True
+                )
+                fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
             clevs = [clevs_abs]*4 + [clevs_dif]*ndata*4
             fmt = [fmt_abs]*4 + [fmt_dif]*ndata*4
