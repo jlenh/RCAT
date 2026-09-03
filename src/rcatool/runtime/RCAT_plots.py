@@ -61,7 +61,7 @@ class PlotConfiguration(object):
 
         self.regions = pdict['regions']
         self.img_dir = pdict['img dir']
-        self.full_domain = pdict['full domain']
+        self.full_domain = pdict['full_domain']
 
         # Map settings
         self.map_projection = pdict['map projection']
@@ -1530,6 +1530,105 @@ class PlotConfiguration(object):
             dim_avg = ('x', 'y') if _dim_avg == 'space' else _dim_avg
 
             grouped = self.moments_plot_conf['grouped boxplot']
+
+            if self.full_domain:
+
+                reg = "full domain"
+
+                mod_data = {}
+                for m, f in zip(self.models, self.fm_list):
+                    with xa.open_dataset(f) as fmod:
+                        dim_avg = self._space_dim(fmod) if\
+                                _dim_avg == 'space' else _dim_avg
+                        mod_mean = fmod[self.var].mean(dim_avg).values.ravel()
+                        mod_data[m] = mod_mean[~np.isnan(mod_mean)]
+                        if m == self.ref_model:
+                            thr = fmod.attrs['Description'].\
+                                split('|')[1].split(':')[1].strip()
+                            moment_stat = fmod.attrs['Description'].\
+                                split('|')[0].split(':')[1].replace(
+                                    ' ', '').lower()
+
+                if self.ref_obs is not None:
+                    obs_data = {}
+                    for o, f in zip(self.obslist, self.fo_list):
+                        with xa.open_dataset(f) as fobs:
+                            dim_avg = self._space_dim(fobs) if\
+                                    _dim_avg == 'space' else _dim_avg
+                            obs_mean = fobs[self.var].mean(
+                                dim_avg).values.ravel()
+                            obs_data[o] = obs_mean[~np.isnan(obs_mean)]
+
+                    dlist = [obs_data[self.ref_obs]] +\
+                            [mod_data[m] for m in self.models]
+
+                    if len(self.obslist) > 1:
+                        dlist[0] += [obs_data[o] for o in self.obslist[1:]]
+                        ll_nms = self.models + self.obslist[1:]
+                    else:
+                        ll_nms = self.models
+                    lg_lbls = [self.ref_obs] + [m.upper() for m in ll_nms]
+                else:
+                    dlist = [mod_data[m] for m in self.models]
+                    lg_lbls = [m.upper() for m in self.models]
+
+                regnm = reg.replace(' ', '_')
+
+                headtitle = (f'{self.var} | Stat: {moment_stat} | '
+                             f'{reg} | {self.tsuffix_title}') if thr == 'None'\
+                    else (f'{self.var} | Threshold: {thr} | Stat: '
+                          f'{moment_stat}\n{reg} | {self.tsuffix_title}')
+
+                fn = self.define_file_names(thr, 'boxplot', region=regnm,
+                                            stat_name=f'stat_{moment_stat}')
+
+                # figure settings
+                figsize = (12, 8)
+                figshape = (1, 1)
+
+                ylabel = [f'{self.units}']
+                ylim = [None]
+                xlabel = ['']
+                xlim = [None]
+                xticks = None
+                xtlbls = None
+
+                rpl.figure_init(plottype='box')
+                fig, lgrid = rpl.fig_grid_setup(
+                    fshape=figshape, figsize=figsize, **self.line_grid)
+
+                lbls = None if grouped else lg_lbls
+                # bx_colors = [abs_colors, rel_colors]
+                axs, bps = rpl.make_box_plot(
+                    lgrid, data=dlist, labels=lbls, leg_labels=None,
+                    grouped=grouped, box_colors=self.abs_colors, whis=[5, 95],
+                    showfliers=False)
+
+                if grouped:
+                    # Legend
+                    leg_elements = [Patch(color=c, label=l)
+                                    for c, l in zip(
+                                        self.abs_colors, lg_lbls[0])]
+
+                    axs[0].legend(handles=leg_elements, fontsize='large',
+                                  framealpha=.5)
+                    leg_elements = [Patch(color=c, label=l)
+                                    for c, l in zip(
+                                        self.rel_colors, lg_lbls[1])]
+                    axs[1].legend(handles=leg_elements, fontsize='large',
+                                  framealpha=.5)
+
+                [rpl.axes_settings(ax, xlabel=xlabel[a], xticks=xticks,
+                                   ylabel=ylabel[a], xtlabels=xtlbls,
+                                   xlim=xlim[a], ylim=ylim[a],
+                                   fontsize='x-large', fontsize_lbls='x-large')
+                 for a, ax in enumerate(axs)]
+
+                ttl = fig.suptitle(headtitle, fontsize='x-large')
+                ttl.set_position((.5, 1.03))
+
+                plt.savefig(os.path.join(
+                    self.img_dir, fn), bbox_inches='tight')
 
             for reg in self.regions:
 
