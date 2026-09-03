@@ -1593,7 +1593,7 @@ class PlotConfiguration(object):
 
             if self.ref_obs is not None:
                 fobs = {o: xa.open_dataset(f)
-                        for o, f in zip(self.obslist, self.fo_listr[reg])}
+                        for o, f in zip(self.obslist, self.fo_list)}
                 obs_data = {o: np.nanmean(
                     fobs[o][self.var].values*100, axis=(1, 2))
                             for o in self.obslist}
