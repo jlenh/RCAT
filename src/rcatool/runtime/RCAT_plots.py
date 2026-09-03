@@ -1228,7 +1228,7 @@ class PlotConfiguration(object):
 
         type_of_plot = self.moments_plot_conf['plot type']
 
-        if type_of_plot == 'timeseries':
+        if "timeseries" in type_of_plot:
 
             if self.full_domain:
                 
@@ -1523,7 +1523,7 @@ class PlotConfiguration(object):
                 plt.savefig(
                     os.path.join(self.img_dir, fn), bbox_inches='tight')
 
-        elif type_of_plot == 'boxplot':
+        if "boxplot" in type_of_plot:
 
             # Dimension(s) to average over
             _dim_avg = self.moments_plot_conf['boxplot averaging dimension']
@@ -1727,7 +1727,7 @@ class PlotConfiguration(object):
                 plt.savefig(os.path.join(
                     self.img_dir, fn), bbox_inches='tight')
 
-        elif type_of_plot == 'map':
+        if "map" in type_of_plot:
 
             # Data
             fmod = {m: xa.open_dataset(f)
