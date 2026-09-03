@@ -61,6 +61,7 @@ class PlotConfiguration(object):
 
         self.regions = pdict['regions']
         self.img_dir = pdict['img dir']
+        self.full_domain = pdict['full_domain']
 
         # Map settings
         self.map_projection = pdict['map projection']
@@ -1577,6 +1578,111 @@ class PlotConfiguration(object):
         """
         Plotting frequency-intensity-distribution plot
         """
+        # If full_domain is set to True, aggregate the PDF over the whole
+        # domain from the input file.
+        if self.full_domain:
+
+            reg = "full_domain"
+
+            fmod = {m: xa.open_dataset(f)
+                    for m, f in zip(self.models, self.fm_list)}
+            mod_data = {m: np.nanmean(
+                fmod[m][self.var].values*100, axis=(1, 2))
+                        for m in self.models}
+
+            bins = fmod[self.ref_model].bin_edges.values[1:]
+            nbins = bins.size
+
+            if self.ref_obs is not None:
+                fobs = {o: xa.open_dataset(f)
+                        for o, f in zip(self.obslist, self.fo_list)}
+                obs_data = {o: np.nanmean(
+                    fobs[o][self.var].values*100, axis=(1, 2))
+                            for o in self.obslist}
+                dlist = [[obs_data[self.ref_obs]] +
+                         [mod_data[m] for m in self.models],
+                         [mod_data[m] - obs_data[self.ref_obs]
+                          for m in self.models]]
+
+                if len(self.obslist) > 1:
+                    dlist[0] += [obs_data[o] for o in self.obslist[1:]]
+                    dlist[1] += [obs_data[o] - obs_data[self.ref_obs]
+                                 for o in self.obslist[1:]]
+                    ll_nms = self.models + self.obslist[1:]
+                else:
+                    ll_nms = self.models
+                lg_lbls = [[self.ref_obs] + [m.upper() for m in ll_nms],
+                           [f'{m.upper()} - {self.ref_obs}' for m in ll_nms]]
+            else:
+                dlist = [[mod_data[m] for m in self.models],
+                         [mod_data[m] - mod_data[self.ref_model]
+                          for m in self.othr_mod]]
+                lg_lbls = [[m.upper() for m in self.models],
+                           [f'{m.upper()} - {self.ref_model.upper()}'
+                            for m in self.othr_mod]]
+
+            # In case of only one model as input and no comparison
+            #   = unlist the array corresponding to the dataset.
+            if not (self.othr_mod or (self.ref_obs is not None)):
+                dlist[0] = dlist[0][0]
+
+            thr = fmod[self.ref_model].attrs['Description'].\
+                split('|')[1].split(':')[1].strip()
+            regnm = reg.replace(' ', '_')
+
+            headtitle = f'{self.var} |  {reg} | {self.tsuffix_title}'\
+                if thr != 'None' else\
+                f'{self.var} |  Threshold: {thr}\n{reg} | {self.tsuffix_title}'
+
+            fn = self.define_file_names(thr, 'lnplot', region=reg)
+
+            # figure settings
+            figsize = (19, 8) if self.othr_mod or (self.ref_obs is not None)\
+                else (10, 8)
+            figshape = (1, 2) if self.othr_mod or (self.ref_obs is not None)\
+                else (1, 1)
+
+            ylabel = ['Frequency (%)', 'Difference']
+            ylim = [None]*2
+            xlabel = ['({})'.format(self.units)]*2
+            xlim = [[-.5, nbins-.5]]*2
+            xticks = range(nbins)[::6]
+            xtlbls = bins[::6]
+
+            rpl.figure_init(plottype='scatter')
+            fig, lgrid = rpl.fig_grid_setup(fshape=figshape, figsize=figsize,
+                                            **self.line_grid)
+            axs = rpl.make_line_plot(lgrid, ydata=dlist, **self.line_sets)
+            if self.var == 'pr':
+                axs[0].set_yscale('log')
+
+            [ln.set_color(lc) for ln, lc in zip(
+                list(axs[0].get_lines())[:len(dlist[0])], self.abs_colors)]
+            if self.othr_mod or (self.ref_obs is not None):
+                [ln.set_color(lc) for ln, lc in zip(
+                    list(axs[1].get_lines())[:len(dlist[1])], self.rel_colors)]
+
+            # Legend
+            legend_elements = [Line2D([0], [0], lw=2, color=c, label=l)
+                               for c, l in zip(self.abs_colors, lg_lbls[0])]
+            axs[0].legend(handles=legend_elements,
+                          fontsize='x-large', framealpha=.5)
+            if self.othr_mod or (self.ref_obs is not None):
+                legend_elements = [
+                    Line2D([0], [0], lw=2, color=c, label=l)
+                    for c, l in zip(self.rel_colors, lg_lbls[1])]
+                axs[1].legend(handles=legend_elements,
+                              fontsize='x-large', framealpha=.5)
+
+            [rpl.axes_settings(ax, xlabel=xlabel[a], xticks=xticks,
+                               ylabel=ylabel[a], xtlabels=xtlbls,
+                               xlim=xlim[a], ylim=ylim[a])
+             for a, ax in enumerate(axs)]
+
+            ttl = fig.suptitle(headtitle, fontsize='xx-large')
+            ttl.set_position((.5, 1.08))
+
+            plt.savefig(os.path.join(self.img_dir, fn), bbox_inches='tight') 
 
         for reg in self.regions:
 
@@ -1616,6 +1722,11 @@ class PlotConfiguration(object):
                            [f'{m.upper()} - {self.ref_model.upper()}'
                             for m in self.othr_mod]]
 
+            # In case of only one model as input and no comparison
+            #   = unlist the array corresponding to the dataset.
+            if not (self.othr_mod or (self.ref_obs is not None)):
+                dlist[0] = dlist[0][0]
+
             thr = fmod[self.ref_model].attrs['Description'].\
                 split('|')[1].split(':')[1].strip()
             regnm = reg.replace(' ', '_')
@@ -1627,8 +1738,10 @@ class PlotConfiguration(object):
             fn = self.define_file_names(thr, 'lnplot', region=regnm)
 
             # figure settings
-            figsize = (19, 8)
-            figshape = (1, 2)
+            figsize = (19, 8) if self.othr_mod or (self.ref_obs is not None)\
+                else (9, 8)
+            figshape = (1, 2) if self.othr_mod or (self.ref_obs is not None)\
+                else (1, 1)
 
             ylabel = ['Frequency (%)', 'Difference']
             ylim = [None]*2
@@ -1646,18 +1759,20 @@ class PlotConfiguration(object):
 
             [ln.set_color(lc) for ln, lc in zip(
                 list(axs[0].get_lines())[:len(dlist[0])], self.abs_colors)]
-            [ln.set_color(lc) for ln, lc in zip(
-                list(axs[1].get_lines())[:len(dlist[1])], self.rel_colors)]
+            if self.othr_mod or (self.ref_obs is not None):
+                [ln.set_color(lc) for ln, lc in zip(
+                    list(axs[1].get_lines())[:len(dlist[1])], self.rel_colors)]
 
             # Legend
             legend_elements = [Line2D([0], [0], lw=2, color=c, label=l)
                                for c, l in zip(self.abs_colors, lg_lbls[0])]
             axs[0].legend(handles=legend_elements,
                           fontsize='x-large', framealpha=.5)
-            legend_elements = [Line2D([0], [0], lw=2, color=c, label=l)
-                               for c, l in zip(self.rel_colors, lg_lbls[1])]
-            axs[1].legend(handles=legend_elements,
-                          fontsize='x-large', framealpha=.5)
+            if self.othr_mod or (self.ref_obs is not None):
+                legend_elements = [Line2D([0], [0], lw=2, color=c, label=l)
+                                for c, l in zip(self.rel_colors, lg_lbls[1])]
+                axs[1].legend(handles=legend_elements,
+                            fontsize='x-large', framealpha=.5)
 
             [rpl.axes_settings(ax, xlabel=xlabel[a], xticks=xticks,
                                ylabel=ylabel[a], xtlabels=xtlbls,
