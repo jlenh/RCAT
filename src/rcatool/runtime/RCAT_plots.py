@@ -61,6 +61,7 @@ class PlotConfiguration(object):
 
         self.regions = pdict['regions']
         self.img_dir = pdict['img dir']
+        self.full_domain = pdict['full_domain']
 
         # Map settings
         self.map_projection = pdict['map projection']
@@ -1227,7 +1228,158 @@ class PlotConfiguration(object):
 
         type_of_plot = self.moments_plot_conf['plot type']
 
-        if type_of_plot == 'timeseries':
+        if "timeseries" in type_of_plot:
+
+            if self.full_domain:
+                
+                reg = "full domain"
+
+                fmod = {m: xa.open_dataset(f)
+                        for m, f in zip(self.models, self.fm_list)}
+                mod_data = {m: np.nanmean(
+                    fmod[m][self.var].values, axis=(1, 2))
+                            for m in self.models}
+                
+                err_len_msg = (
+                    "\n\n\t*** Input data arrays for timeseries plot do not"
+                    " all have the same lengths. This is required for these"
+                    " plots. ***\n\n")
+                ts_len_md = [arr.size for m, arr in mod_data.items()]
+                assert len(set(ts_len_md)) == 1, err_len_msg
+
+                if self.ref_obs is not None:
+                    fobs = {o: xa.open_dataset(f)
+                            for o, f in zip(self.obslist, self.fo_list)}
+                    obs_data = {o: np.nanmean(
+                        fobs[o][self.var].values, axis=(1, 2))
+                                for o in self.obslist}
+
+                    ts_len_all = ts_len_md +\
+                        [v.size for o, v in obs_data.items()]
+                    assert len(set(ts_len_all)) == 1, err_len_msg
+
+                    dlist = [[obs_data[self.ref_obs]] +
+                             [mod_data[m] for m in self.models],
+                             [mod_data[m] - obs_data[self.ref_obs]
+                              for m in self.models]]
+
+                    if len(self.obslist) > 1:
+                        dlist[0] += [obs_data[o] for o in self.obslist[1:]]
+                        dlist[1] += [obs_data[o] - obs_data[self.ref_obs]
+                                     for o in self.obslist[1:]]
+                        ll_nms = self.models + self.obslist[1:]
+                    else:
+                        ll_nms = self.models
+                    lg_lbls = [[self.ref_obs] + [m.upper() for m in ll_nms],
+                               [f'{m.upper()} - {self.ref_obs}'
+                                for m in ll_nms]]
+                else:
+                    dlist = [[mod_data[m] for m in self.models],
+                             [mod_data[m] - mod_data[self.ref_model]
+                              for m in self.othr_mod]]
+                    lg_lbls = [[m.upper() for m in self.models],
+                               [f'{m.upper()} - {self.ref_model.upper()}'
+                                for m in self.othr_mod]]
+
+                thr = fmod[self.ref_model].attrs['Description'].\
+                    split('|')[1].split(':')[1].strip()
+                moment_stat = fmod[self.ref_model].attrs['Description'].\
+                    split('|')[0].split(':')[1].replace(' ', '').lower()
+                regnm = reg.replace(' ', '_')
+
+                headtitle = (
+                    f'{self.var} | Threshold: {thr} | '
+                    f'Stat: {moment_stat}\n{reg} | '
+                    f'{self.tsuffix_title}') if thr != 'None' else\
+                    (f'{self.var} | Stat: {moment_stat}\n{reg} | '
+                     f'{self.tsuffix_title}')
+
+                fn = self.define_file_names(thr, 'timeseries', region=regnm,
+                                            stat_name=f'stat_{moment_stat}')
+                # figure settings
+                figsize = (16, 10) if self.othr_mod or (self.ref_obs is not None) else (8, 10)
+                figshape = (2, 1) if self.othr_mod or (self.ref_obs is not None) else (1, 1)
+
+                ylabel = [f'{self.units}', 'Difference']
+                ylim = [None]*2
+                xlabel = ['']*2
+                xlim = [None]*2
+                xticks = None
+                xtlbls = None
+
+                rpl.figure_init(plottype='line')
+                fig, lgrid = rpl.fig_grid_setup(
+                    fshape=figshape, figsize=figsize, **self.line_grid)
+
+                if self.othr_mod or (self.ref_obs is not None):
+                    axs = rpl.make_line_plot(lgrid, ydata=dlist, **self.line_sets)
+                else:
+                    axs = rpl.make_line_plot(lgrid, ydata=dlist[0], **self.line_sets)
+                [ln.set_color(lc) for ln, lc in zip(
+                    list(axs[0].get_lines())[:len(dlist[0])], self.abs_colors)]
+                if self.othr_mod or (self.ref_obs is not None):
+                    [ln.set_color(lc) for ln, lc in zip(
+                        list(axs[1].get_lines())[:len(dlist[1])],
+                        self.rel_colors)
+                    ]
+
+                # Trendlines
+                if self.moments_plot_conf['trendline']:
+                    for ydata, lc in zip(dlist[0], self.abs_colors):
+                        z = np.polyfit(np.arange(len(ydata)), ydata, 1)
+                        p = np.poly1d(z)
+                        rpl.make_line_plot(
+                            [lgrid[0]], ydata=p(np.arange(len(ydata))),
+                            color='k', lw=1.4, alpha=.6)
+                        rpl.make_line_plot(
+                            [lgrid[0]], ydata=p(np.arange(len(ydata))),
+                            lw=0, marker='o', markersize=3., mec=lc, mfc=lc,
+                            markevery=4, alpha=1)
+                # Running mean
+                if self.moments_plot_conf['running mean']:
+                    window = self.moments_plot_conf['running mean']
+                    for ydata, lc in zip(dlist[0], self.abs_colors):
+                        rmn = run_mean(ydata, window, 'same')
+                        rpl.make_line_plot(
+                            [lgrid[0]], ydata=rmn, color='k', lw=1.4, alpha=.6)
+                        rpl.make_line_plot(
+                            [lgrid[0]], ydata=rmn, lw=0, marker='o',
+                            markersize=2.5, mec=lc, mfc=lc, alpha=1)
+
+                # Legend
+                leg_elements = [Line2D([0], [0], lw=3, color=c, label=l)
+                                for c, l in zip(self.abs_colors, lg_lbls[0])]
+                if self.moments_plot_conf['trendline']:
+                    leg_elements = leg_elements + [
+                        Line2D([0], [0], lw=3, color='k', marker='o', mfc=c,
+                               mec=c, markersize=8, alpha=.6,
+                               label='lin. trend')
+                        for c, _ in zip(self.abs_colors, lg_lbls[0])]
+                if self.moments_plot_conf['running mean']:
+                    leg_elements = leg_elements + [
+                        Line2D([0], [0], lw=3, color='k', marker='o', mfc=c,
+                               mec=c, markersize=8, alpha=.6,
+                               label=f'run. avg (window: {window})')
+                        for c, _ in zip(self.abs_colors, lg_lbls[0])]
+
+                axs[0].legend(handles=leg_elements, ncol=2,
+                              fontsize='x-large', framealpha=.5)
+                if self.othr_mod or (self.ref_obs is not None):
+                    leg_elements = [Line2D([0], [0], lw=3, color=c, label=l)
+                                    for c, l in zip(self.rel_colors, lg_lbls[1])]
+                    axs[1].legend(handles=leg_elements,
+                                fontsize='x-large', framealpha=.5)
+
+                [rpl.axes_settings(ax, xlabel=xlabel[a], xticks=xticks,
+                                   ylabel=ylabel[a], xtlabels=xtlbls,
+                                   xlim=xlim[a], ylim=ylim[a])
+                 for a, ax in enumerate(axs)]
+
+                ttl = fig.suptitle(headtitle, fontsize='xx-large')
+                ttl.set_position((.5, 1.03))
+
+                plt.savefig(
+                    os.path.join(self.img_dir, fn), bbox_inches='tight')
 
             for reg in self.regions:
 
@@ -1371,13 +1523,112 @@ class PlotConfiguration(object):
                 plt.savefig(
                     os.path.join(self.img_dir, fn), bbox_inches='tight')
 
-        elif type_of_plot == 'boxplot':
+        if "boxplot" in type_of_plot:
 
             # Dimension(s) to average over
             _dim_avg = self.moments_plot_conf['boxplot averaging dimension']
             dim_avg = ('x', 'y') if _dim_avg == 'space' else _dim_avg
 
             grouped = self.moments_plot_conf['grouped boxplot']
+
+            if self.full_domain:
+
+                reg = "full domain"
+
+                mod_data = {}
+                for m, f in zip(self.models, self.fm_list):
+                    with xa.open_dataset(f) as fmod:
+                        dim_avg = self._space_dim(fmod) if\
+                                _dim_avg == 'space' else _dim_avg
+                        mod_mean = fmod[self.var].mean(dim_avg).values.ravel()
+                        mod_data[m] = mod_mean[~np.isnan(mod_mean)]
+                        if m == self.ref_model:
+                            thr = fmod.attrs['Description'].\
+                                split('|')[1].split(':')[1].strip()
+                            moment_stat = fmod.attrs['Description'].\
+                                split('|')[0].split(':')[1].replace(
+                                    ' ', '').lower()
+
+                if self.ref_obs is not None:
+                    obs_data = {}
+                    for o, f in zip(self.obslist, self.fo_list):
+                        with xa.open_dataset(f) as fobs:
+                            dim_avg = self._space_dim(fobs) if\
+                                    _dim_avg == 'space' else _dim_avg
+                            obs_mean = fobs[self.var].mean(
+                                dim_avg).values.ravel()
+                            obs_data[o] = obs_mean[~np.isnan(obs_mean)]
+
+                    dlist = [obs_data[self.ref_obs]] +\
+                            [mod_data[m] for m in self.models]
+
+                    if len(self.obslist) > 1:
+                        dlist[0] += [obs_data[o] for o in self.obslist[1:]]
+                        ll_nms = self.models + self.obslist[1:]
+                    else:
+                        ll_nms = self.models
+                    lg_lbls = [self.ref_obs] + [m.upper() for m in ll_nms]
+                else:
+                    dlist = [mod_data[m] for m in self.models]
+                    lg_lbls = [m.upper() for m in self.models]
+
+                regnm = reg.replace(' ', '_')
+
+                headtitle = (f'{self.var} | Stat: {moment_stat} | '
+                             f'{reg} | {self.tsuffix_title}') if thr == 'None'\
+                    else (f'{self.var} | Threshold: {thr} | Stat: '
+                          f'{moment_stat}\n{reg} | {self.tsuffix_title}')
+
+                fn = self.define_file_names(thr, 'boxplot', region=regnm,
+                                            stat_name=f'stat_{moment_stat}')
+
+                # figure settings
+                figsize = (12, 8)
+                figshape = (1, 1)
+
+                ylabel = [f'{self.units}']
+                ylim = [None]
+                xlabel = ['']
+                xlim = [None]
+                xticks = None
+                xtlbls = None
+
+                rpl.figure_init(plottype='box')
+                fig, lgrid = rpl.fig_grid_setup(
+                    fshape=figshape, figsize=figsize, **self.line_grid)
+
+                lbls = None if grouped else lg_lbls
+                # bx_colors = [abs_colors, rel_colors]
+                axs, bps = rpl.make_box_plot(
+                    lgrid, data=dlist, labels=lbls, leg_labels=None,
+                    grouped=grouped, box_colors=self.abs_colors, whis=[5, 95],
+                    showfliers=False)
+
+                if grouped:
+                    # Legend
+                    leg_elements = [Patch(color=c, label=l)
+                                    for c, l in zip(
+                                        self.abs_colors, lg_lbls[0])]
+
+                    axs[0].legend(handles=leg_elements, fontsize='large',
+                                  framealpha=.5)
+                    leg_elements = [Patch(color=c, label=l)
+                                    for c, l in zip(
+                                        self.rel_colors, lg_lbls[1])]
+                    axs[1].legend(handles=leg_elements, fontsize='large',
+                                  framealpha=.5)
+
+                [rpl.axes_settings(ax, xlabel=xlabel[a], xticks=xticks,
+                                   ylabel=ylabel[a], xtlabels=xtlbls,
+                                   xlim=xlim[a], ylim=ylim[a],
+                                   fontsize='x-large', fontsize_lbls='x-large')
+                 for a, ax in enumerate(axs)]
+
+                ttl = fig.suptitle(headtitle, fontsize='x-large')
+                ttl.set_position((.5, 1.03))
+
+                plt.savefig(os.path.join(
+                    self.img_dir, fn), bbox_inches='tight')
 
             for reg in self.regions:
 
@@ -1476,7 +1727,7 @@ class PlotConfiguration(object):
                 plt.savefig(os.path.join(
                     self.img_dir, fn), bbox_inches='tight')
 
-        elif type_of_plot == 'map':
+        if "map" in type_of_plot:
 
             # Data
             fmod = {m: xa.open_dataset(f)
@@ -1510,7 +1761,7 @@ class PlotConfiguration(object):
                         [fmod_msk[m][self.var].values -
                          fmod_msk[self.ref_model][self.var].values
                          for m in self.othr_mod]
-                ndata = self.nmod-1
+                ndata = self.nmod - 1
 
             ftitles = self.define_figure_titles()
 
@@ -1524,12 +1775,12 @@ class PlotConfiguration(object):
                 figsize = (18, 12)
             else:
                 figsize = (20, 10)
-            figshape = (1, ndata+1)
+            figshape = (1, ndata + 1)
 
             if self.var == 'pr':
-                cmap = [mpl.cm.YlGnBu] + [mpl.cm.BrBG]*ndata
+                cmap = [mpl.cm.YlGnBu] + [mpl.cm.BrBG] * ndata
             else:
-                cmap = [mpl.cm.Spectral_r] + [mpl.cm.RdBu_r]*ndata
+                cmap = [mpl.cm.Spectral_r] + [mpl.cm.RdBu_r] * ndata
 
             headtitle = (f'{self.var} [{self.units}] | Stat: '
                          f'{moment_stat} | {self.tsuffix_title}') if\
@@ -1550,13 +1801,15 @@ class PlotConfiguration(object):
                 grid_lines=self.map_gridlines, **self.map_axes_conf)
 
             clevs_abs = self.get_clevs(np.array(dlist[0]), centered=False)
-            clevs_dif = self.get_clevs(np.array(dlist[1]), centered=True)
-
             fmt_abs = self._get_colorbar_label_formatting(clevs_abs[::2])
-            fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
+            clevs_dif = []
+            fmt_dif = []
+            if ndata > 0:
+                clevs_dif = self.get_clevs(np.array(dlist[1]), centered=True)
+                fmt_dif = self._get_colorbar_label_formatting(clevs_dif[::2])
 
-            clevs = [clevs_abs] + [clevs_dif]*ndata
-            fmt = [fmt_abs] + [fmt_dif]*ndata
+            clevs = [clevs_abs] + [clevs_dif] * ndata
+            fmt = [fmt_abs] + [fmt_dif] * ndata
 
             # Plot the maps
             mp = rpl.make_map_plot(
