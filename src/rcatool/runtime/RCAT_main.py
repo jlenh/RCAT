@@ -773,8 +773,11 @@ def calculate_statistics(ddict, varlist, stat, pool, chunk_dim,
             indata = ddict[v][m]['data']
             stats_data[v][m] = {}
 
-            # Remove additional variables in data set
-            if len(indata.data_vars) > 2:
+            # Remove additional variables in data set and in case of
+            # non-numeric data variables, only keep float, int, uint dtypes.
+            extra_vars = (len(indata.data_vars) > 2) or any(
+                indata[vv].dtype.kind not in 'fiu' for vv in indata.data_vars)
+            if extra_vars:
                 indata = indata[v].to_dataset()
 
             # Chunking of data
