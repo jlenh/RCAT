@@ -249,7 +249,7 @@ def get_mod_data(model, mconf, tres, var, varnames, factor, offset, deacc):
     # -- Opening files (possibly with de-accumulation preprocessing)
     if deacc:
         _mdata = xa.open_mfdataset(
-            flist, parallel=True, engine='netcdf4',
+            flist, parallel=False, engine='h5netcdf',
             data_vars='minimal', coords='minimal', combine='by_coords',
             chunks={**ch_t, **ch_x, **ch_y},
             preprocess=(lambda arr: arr.diff('time'))).drop_duplicates(
@@ -263,7 +263,7 @@ def get_mod_data(model, mconf, tres, var, varnames, factor, offset, deacc):
             np.timedelta64(dt.timedelta(seconds=np.round(nsec/2)))
     else:
         _mdata = xa.open_mfdataset(
-            flist, parallel=True, engine='netcdf4',
+            flist, parallel=False, engine='h5netcdf',
             data_vars='minimal', coords='minimal', combine='by_coords',
             chunks={**ch_t, **ch_x, **ch_y}).drop_duplicates(
                 dim='time', keep='last')
