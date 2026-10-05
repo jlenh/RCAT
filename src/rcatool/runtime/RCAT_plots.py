@@ -708,7 +708,7 @@ class PlotConfiguration(object):
 
         if self.include_relative_change:
             fn_stat_names = fn_stat_names + [
-                f'{self.statistic.replace(' ', '_')}_rel_diff'] * ndata
+                f'{self.statistic.replace(" ", "_")}_rel_diff'] * ndata
             units = units + ["%"] * ndata
 
         # Loop over data sets
@@ -1446,8 +1446,8 @@ class PlotConfiguration(object):
                 fn = self.define_file_names(thr, 'timeseries', region=regnm,
                                             stat_name=f'stat_{moment_stat}')
                 # figure settings
-                figsize = (16, 10)
-                figshape = (2, 1)
+                figsize = (16, 10) if self.othr_mod or (self.ref_obs is not None) else (8, 10)
+                figshape = (2, 1) if self.othr_mod or (self.ref_obs is not None) else (1, 1)
 
                 ylabel = [f'{self.units}', 'Difference']
                 ylim = [None]*2
@@ -1460,11 +1460,17 @@ class PlotConfiguration(object):
                 fig, lgrid = rpl.fig_grid_setup(
                     fshape=figshape, figsize=figsize, **self.line_grid)
 
-                axs = rpl.make_line_plot(lgrid, ydata=dlist, **self.line_sets)
+                if self.othr_mod or (self.ref_obs is not None):
+                    axs = rpl.make_line_plot(lgrid, ydata=dlist, **self.line_sets)
+                else:
+                    axs = rpl.make_line_plot(lgrid, ydata=dlist[0], **self.line_sets)
                 [ln.set_color(lc) for ln, lc in zip(
                     list(axs[0].get_lines())[:len(dlist[0])], self.abs_colors)]
-                [ln.set_color(lc) for ln, lc in zip(
-                    list(axs[1].get_lines())[:len(dlist[1])], self.rel_colors)]
+                if self.othr_mod or (self.ref_obs is not None):
+                    [ln.set_color(lc) for ln, lc in zip(
+                        list(axs[1].get_lines())[:len(dlist[1])],
+                        self.rel_colors)
+                    ]
 
                 # Trendlines
                 if self.moments_plot_conf['trendline']:
@@ -1507,10 +1513,11 @@ class PlotConfiguration(object):
 
                 axs[0].legend(handles=leg_elements, ncol=2,
                               fontsize='x-large', framealpha=.5)
-                leg_elements = [Line2D([0], [0], lw=3, color=c, label=l)
-                                for c, l in zip(self.rel_colors, lg_lbls[1])]
-                axs[1].legend(handles=leg_elements,
-                              fontsize='x-large', framealpha=.5)
+                if self.othr_mod or (self.ref_obs is not None):
+                    leg_elements = [Line2D([0], [0], lw=3, color=c, label=l)
+                                    for c, l in zip(self.rel_colors, lg_lbls[1])]
+                    axs[1].legend(handles=leg_elements,
+                                fontsize='x-large', framealpha=.5)
 
                 [rpl.axes_settings(ax, xlabel=xlabel[a], xticks=xticks,
                                    ylabel=ylabel[a], xtlabels=xtlbls,
