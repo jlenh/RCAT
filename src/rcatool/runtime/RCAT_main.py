@@ -1262,6 +1262,7 @@ def get_plot_dict(cdict, var, grid_coords, models, obs, tsuffix_dict, tres,
         'line grid setup': cdict['line grid setup'],
         'line kwargs': cdict['line kwargs'],
         'regions': cdict['regions'],
+        'full_domain': cdict['full domain'],
         'time suffix dict': tsuffix_dict,
         'img dir': os.path.join(img_outdir, st)
     }
