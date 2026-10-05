@@ -631,9 +631,9 @@ def get_file_list(var, obsname, obsfreq, start_date, end_date):
     obsfreq: str
         Temporal resolution of dataset to use, e.g. 'day' or '1hr'
     start_date: str
-        Start date of time period, format YYYYMM
+        Start date of time period, format YYYYMM or YYYY-MM
     end_date: str
-        End date of time period, format YYYYMM
+        End date of time period, format YYYYMM or YYYY-MM
 
     Returns
     -------
@@ -663,14 +663,14 @@ def get_file_list(var, obsname, obsfreq, start_date, end_date):
     obs_file_list = [ln.split('/')[-1] for ln in obs_path_list]
     obs_dates = ['{}-{}'.format(f[sidx:sidx+6], f[eidx:eidx+6])
                  for f in obs_file_list]
-    idx_start = [d.split('-')[0] <= start_date <= d.split('-')[1]
+    idx_start = [d.split('-')[0] <= start_date.replace("-", "") <= d.split('-')[1]
                  for d in obs_dates]
     msg = "Files not found OR selected start date {} ".format(start_date) +\
           "does not match any obs file dates!"
     assert np.sum(idx_start) != 0, msg
     idx_start = np.where(idx_start)[0][0]
 
-    idx_end = [d.split('-')[0] <= end_date <= d.split('-')[1]
+    idx_end = [d.split('-')[0] <= end_date.replace("-", "") <= d.split('-')[1]
                for d in obs_dates]
     msg = "Files not found OR selected end date {} ".format(end_date) +\
           "does not match any obs file dates!"
