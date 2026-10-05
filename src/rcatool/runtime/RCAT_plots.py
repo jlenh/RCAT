@@ -706,7 +706,7 @@ class PlotConfiguration(object):
 
         if self.include_relative_change:
             fn_stat_names = fn_stat_names + [
-                f'{self.statistic.replace(' ', '_')}_rel_diff'] * ndata
+                f'{self.statistic.replace(" ", "_")}_rel_diff'] * ndata
             units = units + ["%"] * ndata
 
         # Loop over data sets
